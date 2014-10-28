@@ -1,8 +1,9 @@
-.sublime-project
-.sublime-workspace
+*.sublime-project
+*.sublime-workspace
 *.o
 *.so
 *.rlib
 *.dll
 *.exe
 /target/
+.DS_Store

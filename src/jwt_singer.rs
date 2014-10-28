@@ -13,7 +13,7 @@ impl JwtSigner {
 
   fn encoded_header(algorithm: Option<Algorithm>) -> &str {
     let new_algorithm = if algorithm.is_none() {
-      Algorithm.HS256;
+      Algorithm.HS256
     } else {
       algorithm
     }
