@@ -6,9 +6,11 @@ struct JwtSigner {
 }
 
 impl JwtSigner {
-  fn encode(algorithm: Algorithm , payload: &str, payloadId: &str, key: &str, claimSet: ClaimSet) -> &str {
-    let segments = vec![encodedHeader(algorithm), encodedPayload(payload, payloadId, claimSet), encodedSignature(join(segments, "."), key, algorithm)];
-    join(segments, ".");
+  fn encode(algorithm: Algorithm , payload: &str, payload_id: &str, key: &str, claim_set: ClaimSet) -> &str {
+    let segments = vec![encoded_header(algorithm).to_string(), encoded_payload(payload, payload_id, claim_set).to_string()]
+    let es = encoded_signature(segments.map(|x| x + "."), key, algorithm).to_string()
+    segments.push(es)
+    segments.map_in_place(|x| x + ".")
   }
 
   fn encoded_header(algorithm: Option<Algorithm>) -> &str {
@@ -18,29 +20,26 @@ impl JwtSigner {
       algorithm
     }
 
-    // create the header
-    ObjectNode header = JsonNodeFactory.instance.objectNode();
-    header.put("type", "JWT");
-    header.put("alg", algorithm.name());
-
-    base64UrlEncode(header.toString().getBytes());
+    let header = format!(r#"{{"type": "JWT", "alg": {}}}"#, algorithm.name)
+    base64_url_encode(header.toString().getBytes());
   }
 
-  fn encodedPayload(payload: &str, payload_id: &str, claimSet: ClaimSet) -> &str {
-    
-    ObjectNode localClaimSet = JsonNodeFactory.instance.objectNode();
-    ObjectNode localPayload = JsonNodeFactory.instance.objectNode();
-    
-    localPayload.put(payloadId, payload);
-    
-    if(claimSet != null) {
-      if(claimSet.getExp() > 0) {
-        localClaimSet.put("exp", claimSet.getExp());
-      }
-      localPayload.putAll(localClaimSet);
+  fn encoded_payload(payload: &str, payload_id: &str, claim_set: Option<ClaimSet>) -> &str {
+    ObjectNode local_claim_set = JsonNodeFactory.instance.objectNode();
+    let local_payload = format!(r#"{{{}: {}}}"#, payload_id, payload)
+    match claim_set {
+      Some(cs) => {
+        if cs.exp > 0 {
+          local_claim_set.put "exp", claim_set.exp;
+        }
+
+        local_payload.putAll(local_claim_set)
+      },
+
+      None => {}
     }
     
-    return base64UrlEncode(localPayload.toString().getBytes());
+    base64_url_encode(local_payload.to_string().into_bytes())
   }
 
   /**
@@ -48,7 +47,7 @@ impl JwtSigner {
    */
   fn encoded_signature(signing_input: &str, key: &str, algorithm: Algorithm) -> &str {
     let signature = sign(algorithm, signing_input, key)
-    base64UrlEncode(signature)
+    base64_url_encode(signature)
   }
 
   /**
@@ -62,43 +61,16 @@ impl JwtSigner {
    * Switch the signing algorithm based on input, RSA not supported
    */
   fn sign(algorithm: Algorithm, msg: &str, key: &str) -> Result<[u8], &str> {
-    algorithm match {
-    case HS256:
-    case HS384:
-    case HS512:
-      return signHmac(algorithm, msg, key);
-    
-    case RS256:
-    case RS384:
-    case RS512:
-    default:
-      throw new OperationNotSupportedException(
-          "Unsupported signing method");
+    match algorithm {
+      HS256 | HS384 | HS512 => Ok(sign_hmac(algorithm, msg, key)),
+      _ => Err("Unsupported signing method")
     }
   }
 
-  /**
-   * Sign an input string using HMAC and return the encrypted bytes
-   */
   fn sign_hmac(algorithm: Algorithm, msg: &str, key: &str) -> [u8] {
     let mac = Mac.getInstance(algorithm.getValue());
     mac.init(new SecretKeySpec(key.getBytes(), algorithm.getValue()));
     mac.doFinal(msg.getBytes());
-  }
-  
-  fn join(input: Vec, on: &str) -> &str {
-    int size = input.size();
-    int count = 1;
-    StringBuilder joined = new StringBuilder();
-    for (String string : input) {
-      joined.append(string);
-      if (count < size) {
-        joined.append(on);
-      }
-      count++;
-    }
-
-    return joined.toString();
   }
 }
 
