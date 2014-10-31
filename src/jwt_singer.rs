@@ -21,7 +21,7 @@ impl JwtSigner {
     }
 
     let header = format!(r#"{{"type": "JWT", "alg": {}}}"#, algorithm.name)
-    base64_url_encode(header.toString().getBytes());
+    base64_url_encode(header.to_string().into_bytes());
   }
 
   fn encoded_payload(payload: &str, payload_id: &str, claim_set: Option<ClaimSet>) -> &str {
@@ -53,8 +53,8 @@ impl JwtSigner {
   /**
    * Safe URL encode a byte array to a String
    */
-  fn base64_url_encode(str: [u8]) -> &str {
-    String::new(Base64.encodeBase64URLSafe(str));
+  fn base64_url_encode(bytes: [u8]) -> &str {
+    bytes.to_base64(base64::URLSAFE_CHARS).as_slice()
   }
 
   /**
@@ -93,6 +93,6 @@ struct ClaimSet {
 
 impl ClaimSet {
   fn set_exp(&self, value: int) {
-    exp = (int)(time::now() / 1000L) + exp
+    exp = (time::now().tm_nsec * 1000) + exp
   }
 }

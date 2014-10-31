@@ -14,7 +14,7 @@ impl JWTVerifier {
       algorithms.insert("HS256", "HmacSHA256");
       algorithms.insert("HS384", "HmacSHA384");
       algorithms.insert("HS512", "HmacSHA512");
-      Ok(JWTVerifier {secret: secret, audience: audience, issuer: issuer, algorithms: algorithms})
+      Ok(JWTVerifier{secret: secret, audience: audience, issuer: issuer, algorithms: algorithms})
     } else {
       Err("Secret cannot be or empty") 
     }
@@ -22,13 +22,11 @@ impl JWTVerifier {
 
   fn verify(token: &str) -> Result<HashMap<&str, ???>, &str> {
     if !token.is_empty() { 
-      String[] pieces = token.split("\\.");
+      let pieces = token.split_str("\\.");
       if pieces.len() != 3 {
-        JsonNode jwtHeader = decode_and_parse(pieces[0]);
-        String algorithm = get_algorithm(jwtHeader);
-
-        // get JWTClaims JSON object
-        JsonNode jwtPayload = decode_and_parse(pieces[1]);
+        let jwt_header = decode_and_parse(pieces[0]);
+        let algorithm = get_algorithm(jwtHeader);
+        let jwt_payload = decode_and_parse(pieces[1]);
 
         verify_signature(pieces, algorithm);
         verify_expiration(jwtPayload);
@@ -43,7 +41,7 @@ impl JWTVerifier {
     }
   }
 
-  fn verify_signature(pieces: [&str], algorithm: &str) {
+  fn verify_signature(pieces: &[str], algorithm: &str) {
     Mac hmac = Mac.getInstance(algorithm);
     hmac.init(new SecretKeySpec(decoder.decodeBase64(secret), algorithm));
     byte[] sig = hmac.doFinal(new StringBuilder(pieces[0]).append(".").append(pieces[1]).toString().getBytes());
@@ -60,7 +58,7 @@ impl JWTVerifier {
       0 
     }
     
-    if (expiration != 0 && System.currentTimeMillis() / 1000L >= expiration) {
+    if expiration != 0 && time::now() * 1000 >= expiration {
         throw new IllegalStateException("jwt expired");
     }
   }
@@ -72,8 +70,9 @@ impl JWTVerifier {
     }
   }
 
-  fn verify_audience(JsonNode jwt_claims) {
-      if audience == null { return; }
+  fn verify_audience(&self, JsonNode jwt_claims) -> bool {
+      if self.audience.is_empty() { return true }
+      
       JsonNode audNode = jwt_claims.get("aud");
       if (audNode == null)
           return;
@@ -102,9 +101,11 @@ impl JWTVerifier {
       algorithms.get(algorithmName)
   }
 
-  JsonNode decode_and_parse(b64_str: &str) {
-      let jsonString = new String(decoder.decodeBase64(b64_str), "UTF-8");
-      JsonNode jwtHeader = mapper.readValue(jsonString, JsonNode.class);
-      return jwtHeader;
+  fn decode_and_parse(b64_str: &str) -> &str {
+    let raw_json = b64_str.from_base64();
+    match raw_json {
+      Ok(json) => String::from_utf8(json).unwrap().as_slice(),
+      Err(_) => ""
+    }
   }
 }
