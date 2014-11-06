@@ -17,11 +17,11 @@ impl JWTVerifier {
       algorithms.insert("HS512", "HmacSHA512");
       Ok(JWTVerifier{secret: secret, audience: audience, issuer: issuer, algorithms: algorithms})
     } else {
-      Err("Secret cannot be or empty") 
+      Err("Secret cannot be or empty")
     }
   }
 
-  fn verify(&self, token: &str) -> Result<HashMap<&str, ???>, &str> {
+  fn verify(&self, token: &str) -> Result<HashMap<&str, &str>, &str> {
     if !token.is_empty() { 
       let pieces = token.split_str("\\.");
       if pieces.len() != 3 {
@@ -30,15 +30,15 @@ impl JWTVerifier {
         let jwt_payload = decode_and_parse(pieces[1]);
 
         verify_signature(pieces, algorithm);
-        verify_expiration(jwtPayload);
-        verify_issuer(jwtPayload);
-        verify_audience(jwtPayload);
-        mapper.treeToValue(jwtPayload, Map.class)
+        verify_expiration(jwt_payload);
+        verify_issuer(jwt_payload);
+        verify_audience(jwt_payload);
+        mapper.treeToValue(jwt_payload, Map.class) //todo return Map(..., ...)
       } else {
         Err(format!("Wrong number of segments: {}", pieces.len())) 
       }
     } else {
-        Err("token not set".to_string()) 
+        Err("Token isn't set") 
     }
   }
 
@@ -60,58 +60,63 @@ impl JWTVerifier {
   }
 
   fn verify_expiration(&self, jwt_claims: json::Json) -> Result<int, &str> {
-    let expiration = if jwt_claims.has("exp") { 
-      jwt_claims.get("exp").asLong(0) 
-    } else { 
-      0 
+    let expiration = jwt_claims.find("exp") match {
+      Some(raw_value) => raw_value.as_i64().unwrap(),
+      None => 0
     }
-    
-    if expiration != 0 && time::now() * 1000 >= expiration {
+
+    if expiration != 0 && time::now().to_timespec().nsec * 1000 >= expiration {
       Err("jwt expired")
     }
   }
 
-  fn verify_issuer(&self, jwt_claims: json::Json) {
-    let issuerFromToken = if jwt_claims.has("iss") { jwt_claims.get("iss").asText() } else { null }
-    if (issuerFromToken != null && issuer != null && !issuer.equals(issuerFromToken)) {
-      throw new IllegalStateException("jwt issuer invalid");
+  fn verify_issuer(&self, jwt_claims: json::Json) -> Result<(), &str> {
+    let maybe_iss = jwt_claims.find("iss");
+    if maybe_iss.is_some() { 
+      let issuer_from_token = maybe_iss.unwrap();
+      if !self.issuer.is_empty() && self.issuer != issuer_from_token {
+        Err("jwt issuer is invalid")
+      }
     }
   }
 
   fn verify_audience(&self, jwt_claims: json::Json) -> Result<(), &str> {
-      if self.audience.is_empty() { return }
-      
-      JsonNode aud_node = jwt_claims.get("aud");
-      if (aud_node == null)
-          return;
-      if (aud_node.isArray()) {
-          for (JsonNode jsonNode : aud_node) {
-              if (audience.equals(jsonNode.textValue()))
-                  return;
+    let err = Err("jwt audience invalid");
+    if self.audience.is_empty() { return }
+    let maybe_aud = jwt_claims.find("aud");
+    if maybe_aud.is_some() {
+      maybe_aud.unwrap() match {
+        List(value) => {
+          if !aud_node.iter().any(|x| x.as_string().unwrap() == self.audience) { 
+            err 
           }
-      } else if (aud_node.isTextual()) {
-          if (audience.equals(aud_node.textValue()))
-              return;
+        },
+        
+        String(value) => {
+          if self.audience != aud_node.as_string().unwrap() { 
+            err
+          }
+        },
+
+        _ => err
       }
-      throw new IllegalStateException("jwt audience invalid");
+    }
   }
 
   fn get_algorithm(&self, jwt_header: json::Json) -> Result<&str, &str> {
-      jwt_header.find("alg") match {
-        Some(value) => {
-          let alg_name = value.as_string().unwrap();
-          algorithms.find(alg_name) match {
-            Some(hmac_alg_name) => hmac_alg_name,
-            None => Err("Algorithm isn't found") 
-          }
-        },
-        None => Err("Unsupported algorithm") 
-      }
+    jwt_header.find("alg") match {
+      Some(value) => {
+        algorithms.find(value.as_string().unwrap()) match {
+          Some(hmac_alg_name) => hmac_alg_name,
+          None => Err("Algorithm isn't found") 
+        }
+      },
+      None => Err("Unsupported algorithm") 
+    }
   }
 
   fn decode_and_parse(&self, b64_str: &str) -> &str {
-    let raw_json = b64_str.from_base64();
-    match raw_json {
+    match b64_str.from_base64() {
       Ok(json) => String::from_utf8(json).unwrap().as_slice(),
       Err(_) => ""
     }

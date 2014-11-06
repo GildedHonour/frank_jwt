@@ -36,7 +36,7 @@ impl JwtSigner {
         local_payload.putAll(local_claim_set)
       },
 
-      None => {}
+      None => ""
     }
     
     base64_url_encode(local_payload.to_string().into_bytes())
@@ -59,7 +59,7 @@ impl JwtSigner {
   }
 
   fn sign_hmac(algorithm: Algorithm, msg: &str, key: &str) -> [u8] {
-    Hmac::new(Md5::new(), t.key[]);
+    Hmac::new(Md5::new(), key);
 
 
     let mac = Mac.getInstance(algorithm.getValue());
