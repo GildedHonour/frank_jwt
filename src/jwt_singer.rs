@@ -78,27 +78,8 @@ impl Algorithm {
   }
 }
 enum Algorithm {
-  Sha256(Sha256),
-  Sha256(Sha256),
-  Sha256(Sha256),
-  Sha256(Sha256),
-  Sha256(Sha256),
-
-  
-  HS256("HmacSHA256"), 
-  HS384("HmacSHA384"), 
-  HS512("HmacSHA512"), 
-  RS256("RS256"), 
-  RS384("RS384"), 
-  RS512("RS512");
-}
-
-struct ClaimSet {
-  exp: int
-}
-
-impl ClaimSet {
-  fn set_exp(&self, value: int) {
-    exp = (time::now().tm_nsec * 1000) + exp
-  }
+  Sha224(Digest),
+  Sha256(Digest),
+  Sha384(Digest),
+  Sha512(Digest)
 }
