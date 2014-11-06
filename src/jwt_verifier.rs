@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use serialize::json;
 
 struct JWTVerifier {
   secret: &str,
@@ -20,7 +21,7 @@ impl JWTVerifier {
     }
   }
 
-  fn verify(token: &str) -> Result<HashMap<&str, ???>, &str> {
+  fn verify(&self, token: &str) -> Result<HashMap<&str, ???>, &str> {
     if !token.is_empty() { 
       let pieces = token.split_str("\\.");
       if pieces.len() != 3 {
@@ -41,67 +42,74 @@ impl JWTVerifier {
     }
   }
 
-  fn verify_signature(pieces: &[str], algorithm: &str) {
+  fn verify_signature(&self, pieces: &[str], digest: Digest) -> Result<bool, &str> {
+    let key = self.secret.from_base64();
+    let hmac = Hmac::new(digest, key);
+
+
+
     Mac hmac = Mac.getInstance(algorithm);
     hmac.init(new SecretKeySpec(decoder.decodeBase64(secret), algorithm));
     byte[] sig = hmac.doFinal(new StringBuilder(pieces[0]).append(".").append(pieces[1]).toString().getBytes());
-
     if (!Arrays.equals(sig, decoder.decodeBase64(pieces[2]))) {
         throw new SignatureException("signature verification failed");
     }
+  
+
+
   }
 
-  fn verify_expiration(JsonNode jwtClaims) {
-    let expiration = if jwtClaims.has("exp") { 
-      jwtClaims.get("exp").asLong(0) 
+  fn verify_expiration(&self, jwt_claims: json::Json) -> Result<int, &str> {
+    let expiration = if jwt_claims.has("exp") { 
+      jwt_claims.get("exp").asLong(0) 
     } else { 
       0 
     }
     
     if expiration != 0 && time::now() * 1000 >= expiration {
-        throw new IllegalStateException("jwt expired");
+      Err("jwt expired")
     }
   }
 
-  fn verify_issuer(JsonNode jwtClaims) {
-    let issuerFromToken = if jwtClaims.has("iss") { jwtClaims.get("iss").asText() } else { null }
+  fn verify_issuer(&self, jwt_claims: json::Json) {
+    let issuerFromToken = if jwt_claims.has("iss") { jwt_claims.get("iss").asText() } else { null }
     if (issuerFromToken != null && issuer != null && !issuer.equals(issuerFromToken)) {
       throw new IllegalStateException("jwt issuer invalid");
     }
   }
 
-  fn verify_audience(&self, JsonNode jwt_claims) -> bool {
-      if self.audience.is_empty() { return true }
+  fn verify_audience(&self, jwt_claims: json::Json) -> Result<(), &str> {
+      if self.audience.is_empty() { return }
       
-      JsonNode audNode = jwt_claims.get("aud");
-      if (audNode == null)
+      JsonNode aud_node = jwt_claims.get("aud");
+      if (aud_node == null)
           return;
-      if (audNode.isArray()) {
-          for (JsonNode jsonNode : audNode) {
+      if (aud_node.isArray()) {
+          for (JsonNode jsonNode : aud_node) {
               if (audience.equals(jsonNode.textValue()))
                   return;
           }
-      } else if (audNode.isTextual()) {
-          if (audience.equals(audNode.textValue()))
+      } else if (aud_node.isTextual()) {
+          if (audience.equals(aud_node.textValue()))
               return;
       }
       throw new IllegalStateException("jwt audience invalid");
   }
 
-  fn get_algorithm(JsonNode jwtHeader) -> Result<, &str> {
-      let algorithmName = jwtHeader.has("alg") ? jwtHeader.get("alg").asText() : null;
-      if (jwtHeader.get("alg") == null) { 
-        Err("algorithm not set")
+  fn get_algorithm(&self, jwt_header: json::Json) -> Result<&str, &str> {
+      jwt_header.find("alg") match {
+        Some(value) => {
+          let alg_name = value.as_string().unwrap();
+          algorithms.find(alg_name) match {
+            Some(hmac_alg_name) => hmac_alg_name,
+            None => Err("Algorithm isn't found") 
+          }
+        },
+        None => Err("Unsupported algorithm") 
       }
-
-      if (algorithms.get(algorithmName) == null) {
-        Err("unsupported algorithm");
-      }
-
-      algorithms.get(algorithmName)
   }
 
-  fn decode_and_parse(b64_str: &str) -> &str {
+  fn decode_and_parse(&self, b64_str: &str) -> &str {
     let raw_json = b64_str.from_base64();
     match raw_json {
       Ok(json) => String::from_utf8(json).unwrap().as_slice(),

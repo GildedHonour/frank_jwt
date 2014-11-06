@@ -42,24 +42,15 @@ impl JwtSigner {
     base64_url_encode(local_payload.to_string().into_bytes())
   }
 
-  /**
-   * Sign the header and payload
-   */
   fn encoded_signature(signing_input: &str, key: &str, algorithm: Algorithm) -> &str {
     let signature = sign(algorithm, signing_input, key)
     base64_url_encode(signature)
   }
 
-  /**
-   * Safe URL encode a byte array to a String
-   */
   fn base64_url_encode(bytes: [u8]) -> &str {
     bytes.to_base64(base64::URLSAFE_CHARS).as_slice()
   }
 
-  /**
-   * Switch the signing algorithm based on input, RSA not supported
-   */
   fn sign(algorithm: Algorithm, msg: &str, key: &str) -> Result<[u8], &str> {
     match algorithm {
       HS256 | HS384 | HS512 => Ok(sign_hmac(algorithm, msg, key)),
@@ -68,6 +59,9 @@ impl JwtSigner {
   }
 
   fn sign_hmac(algorithm: Algorithm, msg: &str, key: &str) -> [u8] {
+    Hmac::new(Md5::new(), t.key[]);
+
+
     let mac = Mac.getInstance(algorithm.getValue());
     mac.init(new SecretKeySpec(key.getBytes(), algorithm.getValue()));
     mac.doFinal(msg.getBytes());
@@ -78,7 +72,19 @@ struct Algorithm {
   value: &str
 }
 
+impl Algorithm {
+  fn new(d: Digest) -> Algorithm {
+
+  }
+}
 enum Algorithm {
+  Sha256(Sha256),
+  Sha256(Sha256),
+  Sha256(Sha256),
+  Sha256(Sha256),
+  Sha256(Sha256),
+
+  
   HS256("HmacSHA256"), 
   HS384("HmacSHA384"), 
   HS512("HmacSHA512"), 
