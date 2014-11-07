@@ -24,7 +24,7 @@ impl JWTVerifier {
   fn verify(&self, token: &str) -> Result<HashMap<&str, &str>, &str> {
     if !token.is_empty() { 
       let pieces = token.split_str("\\.");
-      if pieces.len() != 3 {
+      if pieces.len() != 3 { //todo
         let jwt_header = decode_and_parse(pieces[0]);
         let algorithm = get_algorithm(jwtHeader);
         let jwt_payload = decode_and_parse(pieces[1]);
