@@ -9,3 +9,4 @@
 .DS_Store
 java-jwt-master 2
 tmp
+Cargo.lock
