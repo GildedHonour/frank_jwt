@@ -1,12 +1,4 @@
 [root]
 name = "jwt-rust"
 version = "0.0.1"
-dependencies = [
- "rust-crypto 0.1.0 (git+https://github.com/DaGenix/rust-crypto#6a712849b742659ac97336cc5400cb580923b54c)",
-]
-
-[[package]]
-name = "rust-crypto"
-version = "0.1.0"
-source = "git+https://github.com/DaGenix/rust-crypto#6a712849b742659ac97336cc5400cb580923b54c"
 
