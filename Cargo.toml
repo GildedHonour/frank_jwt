@@ -8,3 +8,6 @@ name = "jwt-rust"
 
 [dependencies]
 rust-crypto = "*"
+
+[dependencies.time]
+git = "https://github.com/rust-lang/time"

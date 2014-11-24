@@ -2,28 +2,33 @@ extern crate serialize;
 extern crate time;
 extern crate "rust-crypto" as rust_crypto;
 
+use serialize::base64;
+use serialize::base64::{ToBase64, URLSAFE_CHARS};
+use serialize::hex::{FromHex, ToHex};
 use serialize::json::ToJson;
 use serialize::json;
 use std::collections::TreeMap;
+use rust_crypto::sha2::Sha256;
+use rust_crypto::hmac::Hmac;
 
 struct JwtHeader {
- alg: &str,
- typ: &str
+ alg: &'static str,
+ typ: &'static str
 }
 
 struct JwtClaims {
-  iss: &str,
+  iss: &'static str,
   iat: int,
   exp: int,
-  qsh: &str,
-  sub: &str
+  qsh: &'static str,
+  sub: &'static str
 }
 
 impl ToJson for JwtHeader {
   fn to_json(&self) -> json::Json {
     let mut d = TreeMap::new();
-    d.insert("alg", self.alg.to_json());
-    d.insert("typ", self.typ.to_json());
+    d.insert("alg".to_string(), self.alg.to_json());
+    d.insert("typ".to_string(), self.typ.to_json());
     json::Object(d)
   }
 }
@@ -41,7 +46,7 @@ impl ToJson for JwtClaims {
 }
 
 
-fn generate_jwt_token(request_url: &str, canonical_url: &str, key: &str, shared_secret: &str) -> &str {
+fn generate_jwt_token(request_url: &str, canonical_url: &str, key: &str, shared_secret: &str) -> &'static str {
   let iat = time::now().tm_nsec * 1000;
   let exp = iat + 180 * 1000;
   let qsh = get_query_string_hash(canonical_url);
@@ -67,28 +72,23 @@ fn get_signing_input(claims: JwtClaims, shared_secret: &str) -> &str {
 }
 
 
-//todo
-fn sign_hmac256(signing_input: &str, shared_secret: &str) -> &str {
-
-  SecretKey key = new SecretKeySpec(sharedSecret.getBytes(), "HmacSHA256");
-  Mac mac = Mac.getInstance("HmacSHA256");
-  mac.init(key);
-  base64_url_encode(mac.doFinal(signingInput.getBytes()))
+fn sign_hmac256(signing_input: &str, shared_secret: &str) -> &'static str {
+  let hmac = Hmac::new(Sha256::new(), shared_secret);
+  hmac.input(signing_input);
+  let result = hmac.result().code;
+  base64_url_encode(result)
 }
 
-//todo
 fn get_query_string_hash(canonical_url: &str) -> &str {
-  MessageDigest md = MessageDigest.getInstance("SHA-256");
-  md.update(canonical_url.getBytes("UTF-8"));
-  byte[] digest = md.digest();
-
-  encode_hex_string(digest)
+  let mut sh = Sha256::new();
+  sh.input_str(canonical_url);
+  sh.result_str()
 }
 
-fn base64_url_encode(bytes: [u8]) -> &str {
+fn base64_url_encode(bytes: [u8]) -> &'static str {
   bytes.to_base64(base64::URLSAFE_CHARS).as_slice()
 }
 
-fn encode_hex_string() -> &str {
-
-}
+// fn encode_hex_string(input: &str) -> &str {
+//   input.to_string().into_bytes().to_hex() //as_slice()
+// }
