@@ -3,9 +3,6 @@ name = "jwt-rust"
 version = "0.0.1"
 authors = ["Alex Maslakov <me@gildedhonour.com>"]
 
-[lib]
-name = "jwt-rust"
-
 [dependencies]
 rust-crypto = "*"
 
