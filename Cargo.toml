@@ -1,10 +1,20 @@
 [package]
-name = "jwt-rust"
-version = "0.0.1"
-authors = ["Alex Maslakov <me@gildedhonour.com>"]
+name = "rust-jwt"
+version = "0.1.0"
+authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
+license = ""
+homepage = "https://github.com/GildedHonour/rust-jwt"
+repository = "https://github.com/GildedHonour/rust-jwt"
+description = ""
+keywords = ["Crypto", "JWT", "JSON", "JSON web token", "jwt.io"]
+readme = "README.md"
 
 [dependencies]
 rust-crypto = "*"
 
 [dependencies.time]
 git = "https://github.com/rust-lang/time"
+
+[lib]
+name = "rust-jwt"
+path = "src/jwt.rs"

@@ -4,8 +4,8 @@ extern crate "rust-crypto" as rust_crypto;
 
 use serialize::base64;
 use serialize::base64::{ToBase64, FromBase64};
-use serialize::json::ToJson;
 use serialize::json;
+use serialize::json::ToJson;
 use serialize::json::Json;
 use std::collections::TreeMap;
 use rust_crypto::sha2::Sha256;
@@ -15,8 +15,8 @@ use rust_crypto::mac::Mac;
 use std::str;
 
 struct JwtHeader<'a> {
- alg: &'a str,
- typ: &'a str
+  alg: &'a str,
+  typ: &'a str
 }
 
 impl<'a> ToJson for JwtHeader<'a> {
@@ -28,7 +28,7 @@ impl<'a> ToJson for JwtHeader<'a> {
   }
 }
 
-fn encode_jwt(payload: TreeMap<String, String>, key: &str) -> String {
+fn encode(payload: TreeMap<String, String>, key: &str) -> String {
   let signing_input = get_signing_input(payload);
   let signature = sign_hmac256(signing_input.as_slice(), key);
   format!("{}.{}", signing_input, signature)
@@ -64,14 +64,37 @@ fn base64_url_encode(bytes: &[u8]) -> String {
 
 
 //decoding
-fn decode_jwt(jwt: &str, key: &str, verify: bool) -> (Json, Json) {
+fn decode(jwt: &str, key: &str, verify: bool) -> (TreeMap<String, String>, TreeMap<String, String>) {
   let(header, payload, signature, signing_input) = decoded_segments(jwt, verify);
   if verify {
     let a = verify_signature(key, signing_input.as_slice(), signature.as_slice());
     println!("valid? {}", a);
   }
 
-  (header, payload)
+  let res1 = match header {
+    json::Object(res) => res,
+    _ => panic!("Error")
+  };
+  
+  let mut res11 = TreeMap::new();
+  for (k, v) in res1.iter() {
+    let val = v.as_string().unwrap().to_string();
+    res11.insert(k.to_string(), val);
+  };
+  
+
+  let res2 = match payload {
+    json::Object(res) => res,
+    _ => panic!("Error")
+  };
+
+  let mut res22 = TreeMap::new();
+  for (k, v) in res2.iter() {
+    let val = v.as_string().unwrap().to_string();
+    res22.insert(k.to_string(), val);
+  };
+
+  (res11, res22)
 }
 
 fn decoded_segments(jwt: &str, verify: bool) -> (Json, Json, Vec<u8>, String) {
@@ -87,7 +110,6 @@ fn decoded_segments(jwt: &str, verify: bool) -> (Json, Json, Vec<u8>, String) {
   };
 
   let signing_input = format!("{}.{}", header_segment, payload_segment);
-  // println!("signature: {}, \nsigning_input: {}", signature, signing_input); //todo
   (header, payload, signature, signing_input)
 }
 
@@ -107,23 +129,25 @@ fn verify_signature(key: &str, signing_input: &str, signature_bytes: &[u8]) -> b
   hmac.input(signing_input.to_string().as_bytes());
   let b = hmac.result();
   let b1 = b.code();
-
-  // println!("\n\na:\n {} \n\n\nb:\n {}\n\n\n", signature_bytes, b1);
   signature_bytes == b1
 }
 
+#[cfg(test)]
+mod tests {
+  use super::encode;
+  use super::decode;
+  use std::collections::TreeMap;
 
+  #[test]
+  fn test1() {
+    let mut payload = TreeMap::new();
+    payload.insert("key1111".to_string(), "val1222".to_string());
+    payload.insert("key2".to_string(), "val2".to_string());
+    payload.insert("key3".to_string(), "val3".to_string());
+    let key = "some_key";
 
-//main
-fn main() {
-  let mut payload = TreeMap::new();
-  payload.insert("key1111".to_string(), "val1222".to_string());
-  payload.insert("key2".to_string(), "val2".to_string());
-  payload.insert("key3".to_string(), "val3".to_string());
-  let key = "some_key";
-  let jwt_token = encode_jwt(payload, key);
-  // println!("jwt_token is {}\n\n", jwt_token);
-  let (header, payload2) = decode_jwt(jwt_token.as_slice(), key, true);
-  // println!("header is {}, payload2 is {}\n", header, payload2);
-
+    let jwt_token = encode(payload.clone(), key);
+    let (header, payload2) = decode(jwt_token.as_slice(), key, true);
+    assert_eq!(payload, payload2);
+  } 
 }

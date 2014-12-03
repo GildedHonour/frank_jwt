@@ -1,6 +1,6 @@
 [root]
 name = "jwt-rust"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "rust-crypto 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.0.3 (git+https://github.com/rust-lang/time)",
