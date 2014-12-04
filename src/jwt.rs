@@ -39,12 +39,8 @@ fn get_signing_input(payload: TreeMap<String, String>) -> String {
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
 
-  let mut payload_json = TreeMap::new();
-  for (k, v) in payload.iter() {
-    payload_json.insert(k.to_string(), v.to_json());
-  }
-  
-  let payload_json = json::Object(payload_json);
+  let mut payload = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
+  let payload_json = json::Object(payload);
   let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
 
   format!("{}.{}", encoded_header, encoded_payload)
@@ -53,48 +49,33 @@ fn get_signing_input(payload: TreeMap<String, String>) -> String {
 fn sign_hmac256(signing_input: &str, key: &str) -> String {
   let mut hmac = Hmac::new(Sha256::new(), key.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
-  let res = hmac.result();
-  base64_url_encode(res.code())
+  base64_url_encode(hmac.result().code())
 }
 
 fn base64_url_encode(bytes: &[u8]) -> String {
   bytes.to_base64(base64::URL_SAFE)
 }
 
-
-
-//decoding
 fn decode(jwt: &str, key: &str, verify: bool) -> (TreeMap<String, String>, TreeMap<String, String>) {
-  let(header, payload, signature, signing_input) = decoded_segments(jwt, verify);
+  fn json_to_tree(input: Json) -> TreeMap<String, String> {
+    match input {
+      json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
+          json::String(s) => s,
+          _ => unreachable!()
+      })).collect(),
+      _ => unreachable!()
+    }
+  };
+
+  let(header_json, payload_json, signature, signing_input) = decoded_segments(jwt, verify);
   if verify {
-    let a = verify_signature(key, signing_input.as_slice(), signature.as_slice());
-    println!("valid? {}", a);
+    let res = verify_signature(key, signing_input.as_slice(), signature.as_slice());
+    assert!(res)
   }
 
-  let res1 = match header {
-    json::Object(res) => res,
-    _ => panic!("Error")
-  };
-  
-  let mut res11 = TreeMap::new();
-  for (k, v) in res1.iter() {
-    let val = v.as_string().unwrap().to_string();
-    res11.insert(k.to_string(), val);
-  };
-  
-
-  let res2 = match payload {
-    json::Object(res) => res,
-    _ => panic!("Error")
-  };
-
-  let mut res22 = TreeMap::new();
-  for (k, v) in res2.iter() {
-    let val = v.as_string().unwrap().to_string();
-    res22.insert(k.to_string(), val);
-  };
-
-  (res11, res22)
+  let header = json_to_tree(header_json);
+  let payload = json_to_tree(payload_json);
+  (header, payload)
 }
 
 fn decoded_segments(jwt: &str, verify: bool) -> (Json, Json, Vec<u8>, String) {
@@ -114,22 +95,21 @@ fn decoded_segments(jwt: &str, verify: bool) -> (Json, Json, Vec<u8>, String) {
 }
 
 fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Json, Json) {
-  let a = header_segment.as_bytes().from_base64();
-  let a1 = a.unwrap();
-  let header = str::from_utf8(a1.as_slice()).unwrap();
+  fn base64_to_json(input: &str) -> Json {
+    let bytes = input.as_bytes().from_base64().unwrap();
+    let s = str::from_utf8(bytes.as_slice()).unwrap();
+    json::from_str(s).unwrap()
+  };
 
-  let b = payload_segment.as_bytes().from_base64();
-  let b1 = b.unwrap();
-  let payload = str::from_utf8(b1.as_slice()).unwrap(); 
-  (json::from_str(header).unwrap(), json::from_str(payload).unwrap())
+  let header_json = base64_to_json(header_segment);
+  let payload_json = base64_to_json(payload_segment);
+  (header_json, payload_json)
 }
 
 fn verify_signature(key: &str, signing_input: &str, signature_bytes: &[u8]) -> bool {
   let mut hmac = Hmac::new(Sha256::new(), key.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
-  let b = hmac.result();
-  let b1 = b.code();
-  signature_bytes == b1
+  signature_bytes == hmac.result().code()
 }
 
 #[cfg(test)]
@@ -139,15 +119,15 @@ mod tests {
   use std::collections::TreeMap;
 
   #[test]
-  fn test1() {
-    let mut payload = TreeMap::new();
-    payload.insert("key1111".to_string(), "val1222".to_string());
-    payload.insert("key2".to_string(), "val2".to_string());
-    payload.insert("key3".to_string(), "val3".to_string());
+  fn test_encode_and_decode_jwt() {
+    let mut p1 = TreeMap::new();
+    p1.insert("key1".to_string(), "val1".to_string());
+    p1.insert("key2".to_string(), "val2".to_string());
+    p1.insert("key3".to_string(), "val3".to_string());
     let key = "some_key";
 
-    let jwt_token = encode(payload.clone(), key);
-    let (header, payload2) = decode(jwt_token.as_slice(), key, true);
-    assert_eq!(payload, payload2);
+    let jwt = encode(p1.clone(), key);
+    let (_, p2) = decode(jwt.as_slice(), key, true);
+    assert_eq!(p1, p2);
   } 
 }
