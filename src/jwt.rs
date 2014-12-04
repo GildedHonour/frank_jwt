@@ -13,6 +13,7 @@ use rust_crypto::hmac::Hmac;
 use rust_crypto::digest::Digest;
 use rust_crypto::mac::Mac;
 use std::str;
+use std::time::duration::Duration;
 
 struct JwtHeader<'a> {
   alg: &'a str,
@@ -67,7 +68,7 @@ fn decode(jwt: &str, key: &str, verify: bool) -> (TreeMap<String, String>, TreeM
     }
   };
 
-  let(header_json, payload_json, signature, signing_input) = decoded_segments(jwt, verify);
+  let (header_json, payload_json, signature, signing_input) = decoded_segments(jwt, verify);
   if verify {
     let res = verify_signature(key, signing_input.as_slice(), signature.as_slice());
     assert!(res)
@@ -114,9 +115,12 @@ fn verify_signature(key: &str, signing_input: &str, signature_bytes: &[u8]) -> b
 
 #[cfg(test)]
 mod tests {
+  extern crate time;
+
   use super::encode;
   use super::decode;
   use std::collections::TreeMap;
+  use std::time::duration::Duration;
 
   #[test]
   fn test_encode_and_decode_jwt() {
@@ -124,10 +128,33 @@ mod tests {
     p1.insert("key1".to_string(), "val1".to_string());
     p1.insert("key2".to_string(), "val2".to_string());
     p1.insert("key3".to_string(), "val3".to_string());
-    let key = "some_key";
+    let secret = "secret123";
 
-    let jwt = encode(p1.clone(), key);
-    let (_, p2) = decode(jwt.as_slice(), key, true);
+    let jwt = encode(p1.clone(), secret);
+    let (_, p2) = decode(jwt.as_slice(), secret, true);
     assert_eq!(p1, p2);
   } 
+
+  #[test]
+  fn test_decode_valid_jwt() {
+    let mut p1 = TreeMap::new();
+    p1.insert("hello".to_string(), "world".to_string());
+    let secret = "secret";
+    let jwt = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJoZWxsbyI6ICJ3b3JsZCJ9.tvagLDLoaiJKxOKqpBXSEGy7SYSifZhjntgm9ctpyj8";
+
+    let (h, p2) = decode(jwt.as_slice(), secret, true);
+    assert_eq!(p1, p2);
+  }
+
+  //todo
+  #[test]
+  fn test_error_when_expired() {
+    let now = time::get_time();
+    let past = now + Duration::minutes(-5);
+
+    let mut p1 = TreeMap::new();
+    p1.insert("exp".to_string(), past.to_string());
+
+    assert!(true)
+  }
 }
