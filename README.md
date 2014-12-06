@@ -34,7 +34,7 @@ extern crate "rust-jwt" as jwt;
 
 ## Licence
 
-[GNU GPL v3.0](https://raw.github.com/GildedHonour/rust-jwt/master/LICENCE)
+[MIT](https://raw.github.com/GildedHonour/rust-jwt/master/LICENCE)
 
 ## Tests
 
