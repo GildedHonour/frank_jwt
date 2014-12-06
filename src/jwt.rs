@@ -157,10 +157,10 @@ mod tests {
   #[test]
   fn test_decode_valid_jwt() {
     let mut p1 = TreeMap::new();
-    p1.insert("hello".to_string(), "world".to_string());
-    let secret = "secret";
-    let jwt = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJoZWxsbyI6ICJ3b3JsZCJ9.tvagLDLoaiJKxOKqpBXSEGy7SYSifZhjntgm9ctpyj8";
-    
+    p1.insert("key11".to_string(), "val1".to_string());
+    p1.insert("key22".to_string(), "val2".to_string());
+    let secret = "secret123";
+    let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c";
     let res = decode(jwt.as_slice(), secret, true, false);
     assert!(res.is_ok() && !res.is_err());
     let (_, p2) = res.ok().unwrap();
