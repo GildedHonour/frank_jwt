@@ -13,7 +13,6 @@ use rust_crypto::hmac::Hmac;
 use rust_crypto::digest::Digest;
 use rust_crypto::mac::Mac;
 use std::str;
-use std::time::duration::Duration;
 
 struct JwtHeader<'a> {
   alg: &'a str,
@@ -29,6 +28,12 @@ impl<'a> ToJson for JwtHeader<'a> {
   }
 }
 
+enum Error {
+  SignatureExpired,
+  SignatureInvalid,
+  JWTInvalid
+}
+
 fn encode(payload: TreeMap<String, String>, key: &str) -> String {
   let signing_input = get_signing_input(payload);
   let signature = sign_hmac256(signing_input.as_slice(), key);
@@ -40,7 +45,7 @@ fn get_signing_input(payload: TreeMap<String, String>) -> String {
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
 
-  let mut payload = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
+  let payload = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
   let payload_json = json::Object(payload);
   let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
 
@@ -57,7 +62,7 @@ fn base64_url_encode(bytes: &[u8]) -> String {
   bytes.to_base64(base64::URL_SAFE)
 }
 
-fn decode(jwt: &str, key: &str, verify: bool) -> (TreeMap<String, String>, TreeMap<String, String>) {
+fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
   fn json_to_tree(input: Json) -> TreeMap<String, String> {
     match input {
       json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
@@ -71,12 +76,24 @@ fn decode(jwt: &str, key: &str, verify: bool) -> (TreeMap<String, String>, TreeM
   let (header_json, payload_json, signature, signing_input) = decoded_segments(jwt, verify);
   if verify {
     let res = verify_signature(key, signing_input.as_slice(), signature.as_slice());
-    assert!(res)
+    if !res {
+      return Err(Error::SignatureInvalid)
+    } 
   }
 
   let header = json_to_tree(header_json);
   let payload = json_to_tree(payload_json);
-  (header, payload)
+  if verify_expiration {
+    if payload.contains_key("exp") {
+      let exp: i64 = from_str(payload.get("exp").unwrap().as_slice()).unwrap();
+      let now = time::get_time().sec;
+      if exp <= now {
+        return Err(Error::SignatureExpired)
+      }
+    }
+  }
+
+  Ok((header, payload))
 }
 
 fn decoded_segments(jwt: &str, verify: bool) -> (Json, Json, Vec<u8>, String) {
@@ -131,7 +148,9 @@ mod tests {
     let secret = "secret123";
 
     let jwt = encode(p1.clone(), secret);
-    let (_, p2) = decode(jwt.as_slice(), secret, true);
+    let res = decode(jwt.as_slice(), secret, true, false);
+    assert!(res.is_ok() && !res.is_err());
+    let (_, p2) = res.ok().unwrap();
     assert_eq!(p1, p2);
   } 
 
@@ -141,20 +160,36 @@ mod tests {
     p1.insert("hello".to_string(), "world".to_string());
     let secret = "secret";
     let jwt = "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJoZWxsbyI6ICJ3b3JsZCJ9.tvagLDLoaiJKxOKqpBXSEGy7SYSifZhjntgm9ctpyj8";
-
-    let (h, p2) = decode(jwt.as_slice(), secret, true);
+    
+    let res = decode(jwt.as_slice(), secret, true, false);
+    assert!(res.is_ok() && !res.is_err());
+    let (_, p2) = res.ok().unwrap();
     assert_eq!(p1, p2);
   }
 
-  //todo
   #[test]
   fn test_error_when_expired() {
     let now = time::get_time();
     let past = now + Duration::minutes(-5);
-
     let mut p1 = TreeMap::new();
-    p1.insert("exp".to_string(), past.to_string());
+    p1.insert("exp".to_string(), past.sec.to_string());
+    p1.insert("key1".to_string(), "val1".to_string());
+    let secret = "secret123";
+    let jwt = encode(p1.clone(), secret);
+    let res = decode(jwt.as_slice(), secret, true, true);
+    assert!(!res.is_ok() && res.is_err());
+  }
 
-    assert!(true)
+  #[test]
+  fn test_ok_when_expired_not_verified() {
+    let now = time::get_time();
+    let past = now + Duration::minutes(-5);
+    let mut p1 = TreeMap::new();
+    p1.insert("exp".to_string(), past.sec.to_string());
+    p1.insert("key1".to_string(), "val1".to_string());
+    let secret = "secret123";
+    let jwt = encode(p1.clone(), secret);
+    let res = decode(jwt.as_slice(), secret, true, false);
+    assert!(res.is_ok() && !res.is_err());
   }
 }
