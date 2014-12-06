@@ -13,7 +13,7 @@ p1.insert("key2".to_string(), "val2".to_string());
 p1.insert("key3".to_string(), "val3".to_string());
 let secret = "secret123";
 
-let jwt = encode(p1.clone(), secret);
+let jwt = jwt::encode(p1.clone(), secret);
 ```
 
 
@@ -22,14 +22,14 @@ let jwt = encode(p1.clone(), secret);
 Put this in your `Cargo.toml`:
 
 ```toml
-[dependencies]
-??? = "*"
+[dependencies.rust-jwt]
+git = "https://github.com/GildedHonour/rust-jwt"
 ```
 
 And this in your crate root:
 
 ```rust
-extern crate ???;
+extern crate "rust-jwt" as jwt;
 ```
 
 ## Licence
