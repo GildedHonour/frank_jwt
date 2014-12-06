@@ -19,6 +19,12 @@ struct JwtHeader<'a> {
   typ: &'a str
 }
 
+pub enum Error {
+  SignatureExpired,
+  SignatureInvalid,
+  JWTInvalid
+}
+
 impl<'a> ToJson for JwtHeader<'a> {
   fn to_json(&self) -> json::Json {
     let mut map = TreeMap::new();
@@ -28,13 +34,7 @@ impl<'a> ToJson for JwtHeader<'a> {
   }
 }
 
-enum Error {
-  SignatureExpired,
-  SignatureInvalid,
-  JWTInvalid
-}
-
-fn encode(payload: TreeMap<String, String>, key: &str) -> String {
+pub fn encode(payload: TreeMap<String, String>, key: &str) -> String {
   let signing_input = get_signing_input(payload);
   let signature = sign_hmac256(signing_input.as_slice(), key);
   format!("{}.{}", signing_input, signature)
@@ -62,7 +62,7 @@ fn base64_url_encode(bytes: &[u8]) -> String {
   bytes.to_base64(base64::URL_SAFE)
 }
 
-fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
+pub fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
   fn json_to_tree(input: Json) -> TreeMap<String, String> {
     match input {
       json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
