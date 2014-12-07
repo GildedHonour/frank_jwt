@@ -127,11 +127,13 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
 fn verify_signature(key: &str, signing_input: &str, signature_bytes: &[u8]) -> bool {
   let mut hmac = Hmac::new(Sha256::new(), key.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
-  secure_compare(signature_bytes, hmac.result().code())
+  signature_bytes == hmac.result().code()
+  // secure_compare(signature_bytes, hmac.result().code()) //todo
 }
 
-fn secure_compare(a, b) -> bool {
-  
+//todo
+fn secure_compare(a: &[u8], b: &[u8]) -> bool {
+  false
 }
 
 #[cfg(test)]
