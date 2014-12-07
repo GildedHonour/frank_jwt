@@ -7,15 +7,13 @@ Implementation of JSON JWT in Rust [JSON Web Tokens](http://jwt.io). It supports
 ## Example
 
 ```
-let mut p1 = TreeMap::new();
-p1.insert("key1".to_string(), "val1".to_string());
-p1.insert("key2".to_string(), "val2".to_string());
-p1.insert("key3".to_string(), "val3".to_string());
+let mut payload = TreeMap::new();
+payload.insert("key1".to_string(), "val1".to_string());
+payload.insert("key2".to_string(), "val2".to_string());
+payload.insert("key3".to_string(), "val3".to_string());
 let secret = "secret123";
-
-let jwt = jwt::encode(p1.clone(), secret);
+let jwt = jwt::encode(payload.clone(), secret);
 ```
-
 
 ## Usage
 
@@ -32,9 +30,9 @@ And this in your crate root:
 extern crate "rust-jwt" as jwt;
 ```
 
-## Licence
+## License
 
-[MIT](https://raw.github.com/GildedHonour/rust-jwt/master/LICENCE)
+It's dual licensed - MIT and Apache 2.0 like the Rust compiler itself.
 
 ## Tests
 
