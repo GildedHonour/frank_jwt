@@ -30,7 +30,7 @@ impl<'a> ToJson for JwtHeader<'a> {
     let mut map = TreeMap::new();
     map.insert("typ".to_string(), self.typ.to_json());
     map.insert("alg".to_string(), self.alg.to_json());
-    json::Object(map)
+    Json::Object(map)
   }
 }
 
@@ -46,7 +46,7 @@ fn get_signing_input(payload: TreeMap<String, String>) -> String {
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
 
   let payload = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
-  let payload_json = json::Object(payload);
+  let payload_json = Json::Object(payload);
   let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
 
   format!("{}.{}", encoded_header, encoded_payload)
@@ -65,8 +65,8 @@ fn base64_url_encode(bytes: &[u8]) -> String {
 pub fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
   fn json_to_tree(input: Json) -> TreeMap<String, String> {
     match input {
-      json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
-          json::String(s) => s,
+      Json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
+          Json::String(s) => s,
           _ => unreachable!()
       })).collect(),
       _ => unreachable!()
