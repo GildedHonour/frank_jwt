@@ -1,5 +1,5 @@
 [package]
-name = "rust-jwt"
+name = "jwt"
 version = "0.1.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
 license = "MIT/Apache-2.0"
@@ -16,5 +16,4 @@ rust-crypto = "*"
 git = "https://github.com/rust-lang/time"
 
 [lib]
-name = "rust-jwt"
-path = "src/jwt.rs"
+name = "jwt"

@@ -1,5 +1,5 @@
 [root]
-name = "rust-jwt"
+name = "jwt"
 version = "0.1.0"
 dependencies = [
  "rust-crypto 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",

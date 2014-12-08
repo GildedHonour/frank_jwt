@@ -127,13 +127,16 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
 fn verify_signature(key: &str, signing_input: &str, signature_bytes: &[u8]) -> bool {
   let mut hmac = Hmac::new(Sha256::new(), key.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
-  signature_bytes == hmac.result().code()
-  // secure_compare(signature_bytes, hmac.result().code()) //todo
+  secure_compare(signature_bytes, hmac.result().code())
 }
 
-//todo
 fn secure_compare(a: &[u8], b: &[u8]) -> bool {
-  false
+  let mut res = 0_u8;
+  for (&x, &y) in a.iter().zip(b.iter()) {
+    res |= x ^ y
+  }
+
+  res == 0
 }
 
 #[cfg(test)]
@@ -174,7 +177,7 @@ mod tests {
   }
 
   #[test]
-  fn test_error_when_expired() {
+  fn test_fails_when_expired() {
     let now = time::get_time();
     let past = now + Duration::minutes(-5);
     let mut p1 = TreeMap::new();
@@ -197,5 +200,17 @@ mod tests {
     let jwt = encode(p1.clone(), secret);
     let res = decode(jwt.as_slice(), secret, true, false);
     assert!(res.is_ok() && !res.is_err());
+  }
+
+  //todo
+  #[test]
+  fn test_secure_compare_same_strings() {
+
+  }
+
+  //todo
+  #[test]
+  fn test_fails_when_secure_compare_different_strings() {
+
   }
 }
