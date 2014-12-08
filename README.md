@@ -20,14 +20,14 @@ let jwt = jwt::encode(payload.clone(), secret);
 Put this in your `Cargo.toml`:
 
 ```toml
-[dependencies.rust-jwt]
+[dependencies.jwt]
 git = "https://github.com/GildedHonour/rust-jwt"
 ```
 
 And this in your crate root:
 
 ```rust
-extern crate "rust-jwt" as jwt;
+extern crate jwt;
 ```
 
 ## License
