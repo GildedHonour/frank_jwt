@@ -131,9 +131,13 @@ fn verify_signature(key: &str, signing_input: &str, signature_bytes: &[u8]) -> b
 }
 
 fn secure_compare(a: &[u8], b: &[u8]) -> bool {
+  if a.len() != b.len() {
+    return false
+  }
+
   let mut res = 0_u8;
   for (&x, &y) in a.iter().zip(b.iter()) {
-    res |= x ^ y
+    res |= x ^ y;
   }
 
   res == 0
@@ -145,6 +149,7 @@ mod tests {
 
   use super::encode;
   use super::decode;
+  use super::secure_compare;
   use std::collections::TreeMap;
   use std::time::duration::Duration;
 
@@ -201,16 +206,25 @@ mod tests {
     let res = decode(jwt.as_slice(), secret, true, false);
     assert!(res.is_ok() && !res.is_err());
   }
-
-  //todo
+  
   #[test]
   fn test_secure_compare_same_strings() {
-
+    let str1 = "same same".as_bytes();
+    let str2 = "same same".as_bytes();
+    let res = secure_compare(str1, str2);
+    assert!(res);
   }
 
-  //todo
   #[test]
   fn test_fails_when_secure_compare_different_strings() {
+    let str1 = "same same".as_bytes();
+    let str2 = "same same but different".as_bytes();
+    let res = secure_compare(str1, str2);
+    assert!(!res);
 
+    let str3 = "same same".as_bytes();
+    let str4 = "same ssss".as_bytes();
+    let res2 = secure_compare(str3, str4);
+    assert!(!res2);
   }
 }
