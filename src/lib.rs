@@ -41,7 +41,7 @@ pub fn encode(payload: TreeMap<String, String>, key: &str) -> String {
 }
 
 fn get_signing_input(payload: TreeMap<String, String>) -> String {
-  let header = JwtHeader {alg: "HS256", typ: "JWT"};
+  let header = JwtHeader{alg: "HS256", typ: "JWT"};
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
 
@@ -75,7 +75,8 @@ pub fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Re
 
   let (header_json, payload_json, signature, signing_input) = decoded_segments(jwt, verify);
   if verify {
-    let res = verify_signature(key, signing_input.as_slice(), signature.as_slice());
+    // let res = verify_signature(signing_input.as_slice(), key, signature.as_slice());
+    let res = verify(signing_input.as_slice(), key, signature.as_slice());
     if !res {
       return Err(Error::SignatureInvalid)
     } 
@@ -124,7 +125,7 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
   (header_json, payload_json)
 }
 
-fn verify_signature(key: &str, signing_input: &str, signature_bytes: &[u8]) -> bool {
+fn verify_signature(signing_input: &str, key: &str, signature_bytes: &[u8]) -> bool {
   let mut hmac = Hmac::new(Sha256::new(), key.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
   secure_compare(signature_bytes, hmac.result().code())
@@ -141,6 +142,29 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
   }
 
   res == 0
+}
+
+pub fn verify(signing_input: &str, key: &str, signature_bytes: &[u8]) -> Result<TreeMap<String, String>, Error> {
+  if signing_input.is_empty() || signing_input.as_slice().is_whitespace() {
+    return Err(Error::JWTInvalid)
+  }
+
+  verify_signature(signing_input, key, signature_bytes);
+  verify_issuer();
+  verify_expiration();
+  verify_audience();
+}
+
+fn verify_issuer(jwt_payload: Json) -> bool {
+
+}
+
+fn verify_expiration(jwt_payload: Json) -> bool {
+
+}
+
+fn verify_audience(jwt_payload: Json) -> bool {
+
 }
 
 #[cfg(test)]
