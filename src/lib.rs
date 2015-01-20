@@ -22,7 +22,10 @@ struct JwtHeader<'a> {
 pub enum Error {
   SignatureExpired,
   SignatureInvalid,
-  JWTInvalid
+  JWTInvalid,
+  IssuerInvalid,
+  ExpirationInvalid,
+  AudienceInvalid
 }
 
 impl<'a> ToJson for JwtHeader<'a> {
@@ -58,42 +61,38 @@ fn sign_hmac256(signing_input: &str, key: &str) -> String {
   base64_url_encode(hmac.result().code())
 }
 
+fn sign_hmac384(signing_input: &str, key: &str) -> String {
+  unimplemented!()
+}
+
+fn sign_hmac512(signing_input: &str, key: &str) -> String {
+  unimplemented!()
+}
+
 fn base64_url_encode(bytes: &[u8]) -> String {
   bytes.to_base64(base64::URL_SAFE)
 }
 
-pub fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
-  fn json_to_tree(input: Json) -> TreeMap<String, String> {
-    match input {
-      Json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
-          Json::String(s) => s,
-          _ => unreachable!()
-      })).collect(),
-      _ => unreachable!()
-    }
-  };
+fn json_to_tree(input: Json) -> TreeMap<String, String> {
+  match input {
+    Json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
+        Json::String(s) => s,
+        _ => unreachable!()
+    })).collect(),
+    _ => unreachable!()
+  }
+}
 
+pub fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
   let (header_json, payload_json, signature, signing_input) = decoded_segments(jwt, verify);
   if verify {
-    // let res = verify_signature(signing_input.as_slice(), key, signature.as_slice());
-    let res = verify(signing_input.as_slice(), key, signature.as_slice());
+    let res = verify(payload_json, signing_input.as_slice(), key, signature.as_slice());
     if !res {
       return Err(Error::SignatureInvalid)
     } 
   }
 
   let header = json_to_tree(header_json);
-  let payload = json_to_tree(payload_json);
-  if verify_expiration {
-    if payload.contains_key("exp") {
-      let exp: i64 = from_str(payload.get("exp").unwrap().as_slice()).unwrap();
-      let now = time::get_time().sec;
-      if exp <= now {
-        return Err(Error::SignatureExpired)
-      }
-    }
-  }
-
   Ok((header, payload))
 }
 
@@ -144,7 +143,7 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
   res == 0
 }
 
-pub fn verify(signing_input: &str, key: &str, signature_bytes: &[u8]) -> Result<TreeMap<String, String>, Error> {
+pub fn verify(Json, signing_input: &str, key: &str, signature_bytes: &[u8]) -> Result<TreeMap<String, String>, Error> {
   if signing_input.is_empty() || signing_input.as_slice().is_whitespace() {
     return Err(Error::JWTInvalid)
   }
@@ -155,16 +154,51 @@ pub fn verify(signing_input: &str, key: &str, signature_bytes: &[u8]) -> Result<
   verify_audience();
 }
 
-fn verify_issuer(jwt_payload: Json) -> bool {
-
+fn verify_issuer(payload_json: Json) -> bool {
+  if iss.is_empty() || signing_input.as_slice().is_whitespace() {
+    return Err(Error::IssuerInvalid)
+  }
 }
 
-fn verify_expiration(jwt_payload: Json) -> bool {
+fn verify_expiration(payload_json: Json) -> bool {
+  let payload = json_to_tree(payload_json);
+  if payload.contains_key("exp") {
+    if exp.is_empty() || signing_input.as_slice().is_whitespace() {
+     return Err(Error::ExpirationInvalid)
+    }
 
+    let exp: i64 = from_str(payload.get("exp").unwrap().as_slice()).unwrap();
+    let now = time::get_time().sec;
+    if exp <= now {
+      return Err(Error::SignatureExpired)
+    }
+  }
 }
 
-fn verify_audience(jwt_payload: Json) -> bool {
+fn verify_audience(payload_json: Json) -> bool {
+  if aud.is_empty() || signing_input.as_slice().is_whitespace() {
+    return Err(Error::AudienceInvalid)
+  }
+}
 
+fn verify_subject(payload_json: Json) -> bool {
+  unimplemented!()  
+}
+
+fn verify_notbefore(payload_json: Json) -> bool {
+  unimplemented!()
+}
+
+fn verify_issuedat(payload_json: Json) -> bool {
+  unimplemented!()
+}
+
+fn verify_jwtid(payload_json: Json) -> bool {
+  unimplemented!()
+}
+
+fn verify_generic(payload_json: Json, parameter_name: String) -> bool {
+  unimplemented!()
 }
 
 #[cfg(test)]
