@@ -19,6 +19,13 @@ struct JwtHeader<'a> {
   typ: &'a str
 }
 
+struct JwtToken<'a> {
+  header: TreeMap<String, String>,
+  payload: TreeMap<String, String>,
+  signature: &'a str,
+  signing_input: &'a str
+}
+
 pub enum Error {
   SignatureExpired,
   SignatureInvalid,
@@ -37,9 +44,9 @@ impl<'a> ToJson for JwtHeader<'a> {
   }
 }
 
-pub fn encode(payload: TreeMap<String, String>, key: &str) -> String {
+pub fn encode(payload: TreeMap<String, String>, secret: &str) -> String {
   let signing_input = get_signing_input(payload);
-  let signature = sign_hmac256(signing_input.as_slice(), key);
+  let signature = sign_hmac256(signing_input.as_slice(), secret);
   format!("{}.{}", signing_input, signature)
 }
 
@@ -55,17 +62,17 @@ fn get_signing_input(payload: TreeMap<String, String>) -> String {
   format!("{}.{}", encoded_header, encoded_payload)
 }
 
-fn sign_hmac256(signing_input: &str, key: &str) -> String {
-  let mut hmac = Hmac::new(Sha256::new(), key.to_string().as_bytes());
+fn sign_hmac256(signing_input: &str, secret: &str) -> String {
+  let mut hmac = Hmac::new(Sha256::new(), secret.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
   base64_url_encode(hmac.result().code())
 }
 
-fn sign_hmac384(signing_input: &str, key: &str) -> String {
+fn sign_hmac384(signing_input: &str, secret: &str) -> String {
   unimplemented!()
 }
 
-fn sign_hmac512(signing_input: &str, key: &str) -> String {
+fn sign_hmac512(signing_input: &str, secret: &str) -> String {
   unimplemented!()
 }
 
@@ -83,33 +90,57 @@ fn json_to_tree(input: Json) -> TreeMap<String, String> {
   }
 }
 
-pub fn decode(jwt: &str, key: &str, verify: bool, verify_expiration: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
-  let (header_json, payload_json, signature, signing_input) = decoded_segments(jwt, verify);
-  if verify {
-    let res = verify(payload_json, signing_input.as_slice(), key, signature.as_slice());
+pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
+  let (header_json, payload_json, signing_input, signature) = decode_segments(token, need_verification);
+  if perform_verification {
+    let res = verify(payload_json, signing_input.as_slice(), secret, signature.as_slice());
     if !res {
       return Err(Error::SignatureInvalid)
-    } 
+    }
   }
 
   let header = json_to_tree(header_json);
   Ok((header, payload))
 }
 
-fn decoded_segments(jwt: &str, verify: bool) -> (Json, Json, Vec<u8>, String) {
+pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: &[u8]) -> Result<TreeMap<String, String>, Error> {
+  if signing_input.is_empty() || signing_input.as_slice().is_whitespace() {
+    return Err(Error::JWTInvalid)
+  }
+
+  verify_signature(signing_input, secret, signature);
+  verify_issuer(payload_json);
+  verify_expiration(payload_json);
+  verify_audience();
+  verify_subject();
+  verify_notbefore();
+  verify_issuedat();
+  verify_jwtid();
+}
+
+//todo
+pub fn verify2(token: &str, secret: &str, options: TreeMap<String, String>) -> JwtToken {
+
+} 
+
+pub fn sign(secret: &str, payload: options: TreeMap<String, String>, options: TreeMap<String, String>) -> String {
+
+}
+
+fn decode_segments(jwt: &str, perform_verification: bool) -> (Json, Json, String, Vec<u8>) {
   let mut raw_segments = jwt.split_str(".");
   let header_segment = raw_segments.next().unwrap();
   let payload_segment = raw_segments.next().unwrap();
   let crypto_segment =  raw_segments.next().unwrap();
   let (header, payload) = decode_header_and_payload(header_segment, payload_segment);
-  let signature = if verify {
+  let signature = if perform_verification {
     crypto_segment.as_bytes().from_base64().unwrap()
   } else {
     vec![]
   };
 
   let signing_input = format!("{}.{}", header_segment, payload_segment);
-  (header, payload, signature, signing_input)
+  (header, payload, signing_input, signature)
 }
 
 fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Json, Json) {
@@ -124,10 +155,10 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
   (header_json, payload_json)
 }
 
-fn verify_signature(signing_input: &str, key: &str, signature_bytes: &[u8]) -> bool {
-  let mut hmac = Hmac::new(Sha256::new(), key.to_string().as_bytes());
+fn verify_signature(signing_input: &str, secret: &str, signature: &[u8]) -> bool {
+  let mut hmac = Hmac::new(Sha256::new(), secret.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
-  secure_compare(signature_bytes, hmac.result().code())
+  secure_compare(signature, hmac.result().code())
 }
 
 fn secure_compare(a: &[u8], b: &[u8]) -> bool {
@@ -143,18 +174,12 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
   res == 0
 }
 
-pub fn verify(Json, signing_input: &str, key: &str, signature_bytes: &[u8]) -> Result<TreeMap<String, String>, Error> {
-  if signing_input.is_empty() || signing_input.as_slice().is_whitespace() {
-    return Err(Error::JWTInvalid)
-  }
-
-  verify_signature(signing_input, key, signature_bytes);
-  verify_issuer();
-  verify_expiration();
-  verify_audience();
-}
 
 fn verify_issuer(payload_json: Json) -> bool {
+  // take "iis" from payload_json
+  // take "iis" from ...
+  // make sure they're equal
+
   if iss.is_empty() || signing_input.as_slice().is_whitespace() {
     return Err(Error::IssuerInvalid)
   }
@@ -163,11 +188,11 @@ fn verify_issuer(payload_json: Json) -> bool {
 fn verify_expiration(payload_json: Json) -> bool {
   let payload = json_to_tree(payload_json);
   if payload.contains_key("exp") {
+    let exp: i64 = from_str(payload.get("exp").unwrap().as_slice()).unwrap();
     if exp.is_empty() || signing_input.as_slice().is_whitespace() {
      return Err(Error::ExpirationInvalid)
     }
-
-    let exp: i64 = from_str(payload.get("exp").unwrap().as_slice()).unwrap();
+    
     let now = time::get_time().sec;
     if exp <= now {
       return Err(Error::SignatureExpired)
@@ -198,6 +223,14 @@ fn verify_jwtid(payload_json: Json) -> bool {
 }
 
 fn verify_generic(payload_json: Json, parameter_name: String) -> bool {
+  let payload = json_to_tree(payload_json);
+  if payload.contains_key(parameter_name) {
+
+    if aud.is_empty() || signing_input.as_slice().is_whitespace() {
+      return Err(Error::AudienceInvalid)
+    }
+  }
+
   unimplemented!()
 }
 
