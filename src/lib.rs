@@ -20,10 +20,16 @@ struct JwtHeader<'a> {
 }
 
 struct JwtToken<'a> {
-  header: TreeMap<String, String>,
+  header: JwtHeader,
   payload: TreeMap<String, String>,
   signature: &'a str,
   signing_input: &'a str
+}
+
+impl<'a> JwtToken<'a> {
+  fn segments_count() -> int {
+    3
+  }
 }
 
 pub enum Error {
@@ -90,7 +96,7 @@ fn json_to_tree(input: Json) -> TreeMap<String, String> {
   }
 }
 
-pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Result<(TreeMap<String, String>, TreeMap<String, String>), Error> {
+pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Option<JwtToken> {
   let (header_json, payload_json, signing_input, signature) = decode_segments(token, need_verification);
   if perform_verification {
     let res = verify(payload_json, signing_input.as_slice(), secret, signature.as_slice());
@@ -123,12 +129,16 @@ pub fn verify2(token: &str, secret: &str, options: TreeMap<String, String>) -> J
 
 } 
 
-pub fn sign(secret: &str, payload: options: TreeMap<String, String>, options: TreeMap<String, String>) -> String {
+pub fn sign(secret: &str, payload: TreeMap<String, String>) -> String {
 
 }
 
-fn decode_segments(jwt: &str, perform_verification: bool) -> (Json, Json, String, Vec<u8>) {
+fn decode_segments(jwt: &str, perform_verification: bool) -> Result<(Json, Json, String, Vec<u8>), Error> {
   let mut raw_segments = jwt.split_str(".");
+  if raw_segments.count() != JwtToken::segments_count {
+    return Err(Error::JWTInvalid)
+  }
+
   let header_segment = raw_segments.next().unwrap();
   let payload_segment = raw_segments.next().unwrap();
   let crypto_segment =  raw_segments.next().unwrap();
@@ -174,8 +184,7 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
   res == 0
 }
 
-
-fn verify_issuer(payload_json: Json) -> bool {
+fn verify_issuer(payload_json: Json, iis: &str) -> bool {
   // take "iis" from payload_json
   // take "iis" from ...
   // make sure they're equal
