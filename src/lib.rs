@@ -20,20 +20,31 @@ struct Header<'a> {
 }
 
 struct Token<'a> {
-  header: Header,
-  payload: BTreeMap<String, String>,
+  header: Option<Header>,
+  payload: Payload,
   signature: &'a str,
   signing_input: &'a str
 }
 
 impl<'a> Token<'a> {
-  fn segments_count() -> int {
+  fn new() -> Token {
+
+  }
+
+  fn segments_count() -> isize {
     3
   }
 }
 
-struct Payload {
-
+struct Payload<'a> {
+  iss: &'a Option<str>,
+  sub: &'a Option<str>,
+  aud: &'a Option<str>,
+  exp: &'a Option<str>,
+  nbf: &'a Option<str>,
+  iat: &'a Option<str>,
+  jti: &'a Option<str>
+  options: Option<BTreeMap<String, String>>
 }
 
 pub enum Error {
