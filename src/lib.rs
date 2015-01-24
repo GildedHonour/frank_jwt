@@ -7,29 +7,33 @@ use serialize::base64::{ToBase64, FromBase64};
 use serialize::json;
 use serialize::json::ToJson;
 use serialize::json::Json;
-use std::collections::TreeMap;
+use std::collections::BTreeMap;
 use rust_crypto::sha2::Sha256;
 use rust_crypto::hmac::Hmac;
 use rust_crypto::digest::Digest;
 use rust_crypto::mac::Mac;
 use std::str;
 
-struct JwtHeader<'a> {
+struct Header<'a> {
   alg: &'a str,
   typ: &'a str
 }
 
-struct JwtToken<'a> {
-  header: JwtHeader,
-  payload: TreeMap<String, String>,
+struct Token<'a> {
+  header: Header,
+  payload: BTreeMap<String, String>,
   signature: &'a str,
   signing_input: &'a str
 }
 
-impl<'a> JwtToken<'a> {
+impl<'a> Token<'a> {
   fn segments_count() -> int {
     3
   }
+}
+
+struct Payload {
+
 }
 
 pub enum Error {
@@ -41,23 +45,23 @@ pub enum Error {
   AudienceInvalid
 }
 
-impl<'a> ToJson for JwtHeader<'a> {
+impl<'a> ToJson for Header<'a> {
   fn to_json(&self) -> json::Json {
-    let mut map = TreeMap::new();
+    let mut map = BTreeMap::new();
     map.insert("typ".to_string(), self.typ.to_json());
     map.insert("alg".to_string(), self.alg.to_json());
     Json::Object(map)
   }
 }
 
-pub fn encode(payload: TreeMap<String, String>, secret: &str) -> String {
+pub fn encode(payload: BTreeMap<String, String>, secret: &str) -> String {
   let signing_input = get_signing_input(payload);
   let signature = sign_hmac256(signing_input.as_slice(), secret);
   format!("{}.{}", signing_input, signature)
 }
 
-fn get_signing_input(payload: TreeMap<String, String>) -> String {
-  let header = JwtHeader{alg: "HS256", typ: "JWT"};
+fn get_signing_input(payload: BTreeMap<String, String>) -> String {
+  let header = Header{alg: "HS256", typ: "JWT"};
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
 
@@ -86,7 +90,7 @@ fn base64_url_encode(bytes: &[u8]) -> String {
   bytes.to_base64(base64::URL_SAFE)
 }
 
-fn json_to_tree(input: Json) -> TreeMap<String, String> {
+fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   match input {
     Json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
         Json::String(s) => s,
@@ -96,7 +100,7 @@ fn json_to_tree(input: Json) -> TreeMap<String, String> {
   }
 }
 
-pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Option<JwtToken> {
+pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Option<Token> {
   let (header_json, payload_json, signing_input, signature) = decode_segments(token, need_verification);
   if perform_verification {
     let res = verify(payload_json, signing_input.as_slice(), secret, signature.as_slice());
@@ -109,7 +113,7 @@ pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Option<J
   Ok((header, payload))
 }
 
-pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: &[u8]) -> Result<TreeMap<String, String>, Error> {
+pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: &[u8]) -> Result<BTreeMap<String, String>, Error> {
   if signing_input.is_empty() || signing_input.as_slice().is_whitespace() {
     return Err(Error::JWTInvalid)
   }
@@ -125,17 +129,17 @@ pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: 
 }
 
 //todo
-pub fn verify2(token: &str, secret: &str, options: TreeMap<String, String>) -> JwtToken {
+pub fn verify2(token: &str, secret: &str, options: BTreeMap<String, String>) -> Token {
 
 } 
 
-pub fn sign(secret: &str, payload: TreeMap<String, String>) -> String {
+pub fn sign(secret: &str, payload: BTreeMap<String, String>) -> String {
 
 }
 
 fn decode_segments(jwt: &str, perform_verification: bool) -> Result<(Json, Json, String, Vec<u8>), Error> {
   let mut raw_segments = jwt.split_str(".");
-  if raw_segments.count() != JwtToken::segments_count {
+  if raw_segments.count() != Token::segments_count {
     return Err(Error::JWTInvalid)
   }
 
@@ -250,12 +254,12 @@ mod tests {
   use super::encode;
   use super::decode;
   use super::secure_compare;
-  use std::collections::TreeMap;
+  use std::collections::BTreeMap;
   use std::time::duration::Duration;
 
   #[test]
   fn test_encode_and_decode_jwt() {
-    let mut p1 = TreeMap::new();
+    let mut p1 = BTreeMap::new();
     p1.insert("key1".to_string(), "val1".to_string());
     p1.insert("key2".to_string(), "val2".to_string());
     p1.insert("key3".to_string(), "val3".to_string());
@@ -270,7 +274,7 @@ mod tests {
 
   #[test]
   fn test_decode_valid_jwt() {
-    let mut p1 = TreeMap::new();
+    let mut p1 = BTreeMap::new();
     p1.insert("key11".to_string(), "val1".to_string());
     p1.insert("key22".to_string(), "val2".to_string());
     let secret = "secret123";
@@ -285,7 +289,7 @@ mod tests {
   fn test_fails_when_expired() {
     let now = time::get_time();
     let past = now + Duration::minutes(-5);
-    let mut p1 = TreeMap::new();
+    let mut p1 = BTreeMap::new();
     p1.insert("exp".to_string(), past.sec.to_string());
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
@@ -298,7 +302,7 @@ mod tests {
   fn test_ok_when_expired_not_verified() {
     let now = time::get_time();
     let past = now + Duration::minutes(-5);
-    let mut p1 = TreeMap::new();
+    let mut p1 = BTreeMap::new();
     p1.insert("exp".to_string(), past.sec.to_string());
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
