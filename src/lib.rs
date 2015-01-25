@@ -21,7 +21,7 @@ struct Header<'a> {
 
 struct Token<'a> {
   header: Option<Header>,
-  payload: Payload,
+  payload: BTreeMap<String, String>,
   signature: &'a str,
   signing_input: &'a str
 }
@@ -36,17 +36,6 @@ impl<'a> Token<'a> {
   }
 }
 
-struct Payload<'a> {
-  iss: &'a Option<str>,
-  sub: &'a Option<str>,
-  aud: &'a Option<str>,
-  exp: &'a Option<str>,
-  nbf: &'a Option<str>,
-  iat: &'a Option<str>,
-  jti: &'a Option<str>
-  options: Option<BTreeMap<String, String>>
-}
-
 pub enum Error {
   SignatureExpired,
   SignatureInvalid,
@@ -54,6 +43,12 @@ pub enum Error {
   IssuerInvalid,
   ExpirationInvalid,
   AudienceInvalid
+}
+
+enum Algorithm {
+  HS256,
+  HS384,
+  HS512
 }
 
 impl<'a> ToJson for Header<'a> {
@@ -84,18 +79,28 @@ fn get_signing_input(payload: BTreeMap<String, String>) -> String {
 }
 
 fn sign_hmac256(signing_input: &str, secret: &str) -> String {
-  let mut hmac = Hmac::new(Sha256::new(), secret.to_string().as_bytes());
+  sign_hmac(algorithm::HS256, signing_input, secret)
+}
+
+fn sign_hmac384(signing_input: &str, secret: &str) -> String {
+  sign_hmac(algorithm::HS384, signing_input, secret)
+}
+
+fn sign_hmac512(signing_input: &str, secret: &str) -> String {
+  sign_hmac(algorithm::HS512, signing_input, secret)
+}
+
+fn sign_hmac(algorithm: Algorithm, signing_input: &str, secret: &str) -> String {
+  let mut hmac = Hmac::new(match algorithm {
+      algorithm::HS256 => Sha512::new(),
+      algorithm::HS384 => Sha384::new(),
+      algorithm::HS512 => Sha512::new()
+    }, secret.to_string().as_bytes()
+  );
   hmac.input(signing_input.to_string().as_bytes());
   base64_url_encode(hmac.result().code())
 }
 
-fn sign_hmac384(signing_input: &str, secret: &str) -> String {
-  unimplemented!()
-}
-
-fn sign_hmac512(signing_input: &str, secret: &str) -> String {
-  unimplemented!()
-}
 
 fn base64_url_encode(bytes: &[u8]) -> String {
   bytes.to_base64(base64::URL_SAFE)
