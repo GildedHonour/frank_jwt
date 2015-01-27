@@ -1,6 +1,6 @@
 extern crate serialize;
 extern crate time;
-extern crate "rust-crypto" as rust_crypto;
+extern crate "crypto" as crypto;
 
 use serialize::base64;
 use serialize::base64::{ToBase64, FromBase64};
@@ -8,10 +8,10 @@ use serialize::json;
 use serialize::json::ToJson;
 use serialize::json::Json;
 use std::collections::BTreeMap;
-use rust_crypto::sha2::Sha256;
-use rust_crypto::hmac::Hmac;
-use rust_crypto::digest::Digest;
-use rust_crypto::mac::Mac;
+use crypto::sha2::Sha256;
+use crypto::hmac::Hmac;
+use crypto::digest::Digest;
+use crypto::mac::Mac;
 use std::str;
 
 struct Header<'a> {
@@ -91,16 +91,10 @@ fn sign_hmac512(signing_input: &str, secret: &str) -> String {
 }
 
 fn sign_hmac(algorithm: Algorithm, signing_input: &str, secret: &str) -> String {
-  let mut hmac = Hmac::new(match algorithm {
-      algorithm::HS256 => Sha512::new(),
-      algorithm::HS384 => Sha384::new(),
-      algorithm::HS512 => Sha512::new()
-    }, secret.to_string().as_bytes()
-  );
+  let mut hmac = Hmac::new(create_digest_by_algorithm(algorithm), secret.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
   base64_url_encode(hmac.result().code())
 }
-
 
 fn base64_url_encode(bytes: &[u8]) -> String {
   bytes.to_base64(base64::URL_SAFE)
@@ -145,7 +139,7 @@ pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: 
 }
 
 //todo
-pub fn verify2(token: &str, secret: &str, options: BTreeMap<String, String>) -> Token {
+pub fn verify2(token: &str, secret: &str, payload: BTreeMap<String, String>) -> Token {
 
 } 
 
@@ -185,10 +179,18 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
   (header_json, payload_json)
 }
 
-fn verify_signature(signing_input: &str, secret: &str, signature: &[u8]) -> bool {
-  let mut hmac = Hmac::new(Sha256::new(), secret.to_string().as_bytes());
+fn verify_signature(algorithm: Algorithm, signing_input: &str, secret: &str, signature: &[u8]) -> bool {
+  let mut hmac = Hmac::new(create_digest_by_algorithm(algorithm), secret.to_string().as_bytes());
   hmac.input(signing_input.to_string().as_bytes());
   secure_compare(signature, hmac.result().code())
+}
+
+fn create_digest_by_algorithm(algorithm: Algorithm) -> Digest {
+  match algorithm {
+    algorithm::HS256 => Sha512::new(),
+    algorithm::HS384 => Sha384::new(),
+    algorithm::HS512 => Sha512::new()
+  }
 }
 
 fn secure_compare(a: &[u8], b: &[u8]) -> bool {
