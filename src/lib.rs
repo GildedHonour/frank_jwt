@@ -8,7 +8,7 @@ use serialize::json;
 use serialize::json::ToJson;
 use serialize::json::Json;
 use std::collections::BTreeMap;
-use crypto::sha2::Sha256;
+use crypto::sha2::{Sha256, Sha384, Sha512};
 use crypto::hmac::Hmac;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
@@ -79,15 +79,15 @@ fn get_signing_input(payload: BTreeMap<String, String>) -> String {
 }
 
 fn sign_hmac256(signing_input: &str, secret: &str) -> String {
-  sign_hmac(algorithm::HS256, signing_input, secret)
+  sign_hmac(Algorithm::HS256, signing_input, secret)
 }
 
 fn sign_hmac384(signing_input: &str, secret: &str) -> String {
-  sign_hmac(algorithm::HS384, signing_input, secret)
+  sign_hmac(Algorithm::HS384, signing_input, secret)
 }
 
 fn sign_hmac512(signing_input: &str, secret: &str) -> String {
-  sign_hmac(algorithm::HS512, signing_input, secret)
+  sign_hmac(Algorithm::HS512, signing_input, secret)
 }
 
 fn sign_hmac(algorithm: Algorithm, signing_input: &str, secret: &str) -> String {
@@ -111,7 +111,7 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
 }
 
 pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Option<Token> {
-  let (header_json, payload_json, signing_input, signature) = decode_segments(token, need_verification);
+  let (header_json, payload_json, signing_input, signature) = decode_segments(token, perform_verification);
   if perform_verification {
     let res = verify(payload_json, signing_input.as_slice(), secret, signature.as_slice());
     if !res {
@@ -120,6 +120,7 @@ pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Option<T
   }
 
   let header = json_to_tree(header_json);
+  let payload = json_to_tree(payload_json);
   Ok((header, payload))
 }
 
@@ -187,9 +188,9 @@ fn verify_signature(algorithm: Algorithm, signing_input: &str, secret: &str, sig
 
 fn create_digest_by_algorithm(algorithm: Algorithm) -> Digest {
   match algorithm {
-    algorithm::HS256 => Sha512::new(),
-    algorithm::HS384 => Sha384::new(),
-    algorithm::HS512 => Sha512::new()
+    Algorithm::HS256 => Sha256::new(),
+    Algorithm::HS384 => Sha384::new(),
+    Algorithm::HS512 => Sha512::new()
   }
 }
 
@@ -206,9 +207,9 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
   res == 0
 }
 
-fn verify_issuer(payload_json: Json, iis: &str) -> bool {
-  // take "iis" from payload_json
-  // take "iis" from ...
+fn verify_issuer(payload_json: Json, iss: &str) -> bool {
+  // take "iss" from payload_json
+  // take "iss" from ...
   // make sure they're equal
 
   if iss.is_empty() || signing_input.as_slice().is_whitespace() {
@@ -219,7 +220,7 @@ fn verify_issuer(payload_json: Json, iis: &str) -> bool {
 fn verify_expiration(payload_json: Json) -> bool {
   let payload = json_to_tree(payload_json);
   if payload.contains_key("exp") {
-    let exp: i64 = from_str(payload.get("exp").unwrap().as_slice()).unwrap();
+    let exp: i64 = json::from_str(payload.get("exp").unwrap().as_slice()).unwrap();
     if exp.is_empty() || signing_input.as_slice().is_whitespace() {
      return Err(Error::ExpirationInvalid)
     }
