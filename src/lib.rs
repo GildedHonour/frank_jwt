@@ -19,19 +19,24 @@ struct Header<'a> {
   typ: &'a str
 }
 
+impl<'a> Header<'a> {
+  pub fn new(alg: Algorithm) -> Header<'a> {
+    Header{alg: algorithm_to_string(alg), typ: "JWT"}
+  }
+}
 struct Token<'a> {
-  header: Option<Header>,
+  header: Option<Header<'a>>,
   payload: BTreeMap<String, String>,
   signature: &'a str,
   signing_input: &'a str
 }
 
 impl<'a> Token<'a> {
-  fn new() -> Token {
+  fn new() -> Token<'a> {
 
   }
 
-  fn segments_count() -> isize {
+  fn segments_count() -> usize {
     3
   }
 }
@@ -51,6 +56,14 @@ enum Algorithm {
   HS512
 }
 
+fn algorithm_to_string(alg: Algorithm) -> String {
+  match alg {
+    Algorithm::HS256 => "HS256",
+    Algorithm::HS384 => "HS384",
+    Algorithm::HS512 => "HS512"
+  }
+}
+
 impl<'a> ToJson for Header<'a> {
   fn to_json(&self) -> json::Json {
     let mut map = BTreeMap::new();
@@ -60,9 +73,15 @@ impl<'a> ToJson for Header<'a> {
   }
 }
 
-pub fn encode(payload: BTreeMap<String, String>, secret: &str) -> String {
+pub fn sign(header: Header, payload: BTreeMap<String, String>, secret: &str) -> String {
+  let algorithm = //get from header
+    Algorithm::HS256
+  } else {
+    maybe_algorithm.unwrap()
+  };
+
   let signing_input = get_signing_input(payload);
-  let signature = sign_hmac256(signing_input.as_slice(), secret);
+  let signature = sign_hmac(signing_input.as_slice(), secret, algorithm);
   format!("{}.{}", signing_input, signature)
 }
 
@@ -79,19 +98,24 @@ fn get_signing_input(payload: BTreeMap<String, String>) -> String {
 }
 
 fn sign_hmac256(signing_input: &str, secret: &str) -> String {
-  sign_hmac(Algorithm::HS256, signing_input, secret)
+  sign_hmac(signing_input, secret, Algorithm::HS256)
 }
 
 fn sign_hmac384(signing_input: &str, secret: &str) -> String {
-  sign_hmac(Algorithm::HS384, signing_input, secret)
+  sign_hmac(signing_input, secret, Algorithm::HS384)
 }
 
 fn sign_hmac512(signing_input: &str, secret: &str) -> String {
-  sign_hmac(Algorithm::HS512, signing_input, secret)
+  sign_hmac(signing_input, secret, Algorithm::HS512)
 }
 
-fn sign_hmac(algorithm: Algorithm, signing_input: &str, secret: &str) -> String {
-  let mut hmac = Hmac::new(create_digest_by_algorithm(algorithm), secret.to_string().as_bytes());
+fn sign_hmac(signing_input: &str, secret: &str, algorithm: Algorithm) -> String {
+  let mut hmac = Hmac::new(match algorithm {
+      Algorithm::HS256 => Sha256::new(),
+      Algorithm::HS384 => Sha384::new(),
+      Algorithm::HS512 => Sha512::new()
+    }, secret.to_string().as_bytes()
+  );
   hmac.input(signing_input.to_string().as_bytes());
   base64_url_encode(hmac.result().code())
 }
@@ -110,47 +134,48 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   }
 }
 
-pub fn decode(token: &str, secret: &str, perform_verification: bool) -> Option<Token> {
-  let (header_json, payload_json, signing_input, signature) = decode_segments(token, perform_verification);
-  if perform_verification {
-    let res = verify(payload_json, signing_input.as_slice(), secret, signature.as_slice());
-    if !res {
-      return Err(Error::SignatureInvalid)
-    }
-  }
+pub fn decode<'a>(token: &str, secret: &str, perform_verification: bool, algorithm: Option<Algorithm>) -> Option<Token<'a>> {
+  match decode_segments(token, perform_verification) {
+    Some(header_json, payload_json, signing_input, signature) => {
+      if perform_verification {
+        let res = verify(payload_json, signing_input.as_slice(), secret, signature.as_slice());
+        if !res {
+          return None
+        }
+      }
 
-  let header = json_to_tree(header_json);
-  let payload = json_to_tree(payload_json);
-  Ok((header, payload))
+      let header = json_to_tree(header_json);
+      let payload = json_to_tree(payload_json);
+      Some((header, payload))
+    },
+
+    None => None
+  }
 }
 
-pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: &[u8]) -> Result<BTreeMap<String, String>, Error> {
-  if signing_input.is_empty() || signing_input.as_slice().is_whitespace() {
-    return Err(Error::JWTInvalid)
+pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: &[u8]) -> bool {
+  if signing_input.is_empty() || signing_input.is_whitespace() {
+    return None
   }
 
   verify_signature(signing_input, secret, signature);
-  verify_issuer(payload_json);
-  verify_expiration(payload_json);
-  verify_audience();
-  verify_subject();
-  verify_notbefore();
-  verify_issuedat();
-  verify_jwtid();
+  // verify_issuer(payload_json);
+  // verify_expiration(payload_json);
+  // verify_audience();
+  // verify_subject();
+  // verify_notbefore();
+  // verify_issuedat();
+  // verify_jwtid();
 }
 
 //todo
-pub fn verify2(token: &str, secret: &str, payload: BTreeMap<String, String>) -> Token {
+pub fn verify2<'a>(token: &str, secret: &str, payload: BTreeMap<String, String>) -> Token<'a> {
 
 } 
 
-pub fn sign(secret: &str, payload: BTreeMap<String, String>) -> String {
-
-}
-
 fn decode_segments(jwt: &str, perform_verification: bool) -> Result<(Json, Json, String, Vec<u8>), Error> {
   let mut raw_segments = jwt.split_str(".");
-  if raw_segments.count() != Token::segments_count {
+  if raw_segments.count() != Token::segments_count() {
     return Err(Error::JWTInvalid)
   }
 
@@ -165,7 +190,7 @@ fn decode_segments(jwt: &str, perform_verification: bool) -> Result<(Json, Json,
   };
 
   let signing_input = format!("{}.{}", header_segment, payload_segment);
-  (header, payload, signing_input, signature)
+  Ok((header, payload, signing_input, signature))
 }
 
 fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Json, Json) {
@@ -181,17 +206,16 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
 }
 
 fn verify_signature(algorithm: Algorithm, signing_input: &str, secret: &str, signature: &[u8]) -> bool {
-  let mut hmac = Hmac::new(create_digest_by_algorithm(algorithm), secret.to_string().as_bytes());
+  let mut hmac = Hmac::new(match algorithm {
+      Algorithm::HS256 => Sha256::new(),
+      Algorithm::HS384 => Sha384::new(),
+      Algorithm::HS512 => Sha512::new(),
+      _ => panic!()
+    }, secret.to_string().as_bytes()
+  );
+
   hmac.input(signing_input.to_string().as_bytes());
   secure_compare(signature, hmac.result().code())
-}
-
-fn create_digest_by_algorithm(algorithm: Algorithm) -> Digest {
-  match algorithm {
-    Algorithm::HS256 => Sha256::new(),
-    Algorithm::HS384 => Sha384::new(),
-    Algorithm::HS512 => Sha512::new()
-  }
 }
 
 fn secure_compare(a: &[u8], b: &[u8]) -> bool {
@@ -212,34 +236,32 @@ fn verify_issuer(payload_json: Json, iss: &str) -> bool {
   // take "iss" from ...
   // make sure they're equal
 
-  if iss.is_empty() || signing_input.as_slice().is_whitespace() {
-    return Err(Error::IssuerInvalid)
-  }
+  // if iss.is_empty() || signing_input.as_slice().is_whitespace() {
+  //   return Err(Error::IssuerInvalid)
+  // }
+  unimplemented!()
 }
 
 fn verify_expiration(payload_json: Json) -> bool {
   let payload = json_to_tree(payload_json);
   if payload.contains_key("exp") {
     let exp: i64 = json::from_str(payload.get("exp").unwrap().as_slice()).unwrap();
-    if exp.is_empty() || signing_input.as_slice().is_whitespace() {
-     return Err(Error::ExpirationInvalid)
-    }
+    // if exp.is_empty() || signing_input.as_slice().is_whitespace() {
+    //  return false
+    // }
     
-    let now = time::get_time().sec;
-    if exp <= now {
-      return Err(Error::SignatureExpired)
-    }
+    exp > time::get_time().sec
+  } else {
+    false
   }
 }
 
-fn verify_audience(payload_json: Json) -> bool {
-  if aud.is_empty() || signing_input.as_slice().is_whitespace() {
-    return Err(Error::AudienceInvalid)
-  }
+fn verify_audience(payload_json: Json, aud: &str) -> bool {
+  unimplemented!()
 }
 
 fn verify_subject(payload_json: Json) -> bool {
-  unimplemented!()  
+  unimplemented!()
 }
 
 fn verify_notbefore(payload_json: Json) -> bool {
@@ -256,11 +278,8 @@ fn verify_jwtid(payload_json: Json) -> bool {
 
 fn verify_generic(payload_json: Json, parameter_name: String) -> bool {
   let payload = json_to_tree(payload_json);
-  if payload.contains_key(parameter_name) {
-
-    if aud.is_empty() || signing_input.as_slice().is_whitespace() {
-      return Err(Error::AudienceInvalid)
-    }
+  if payload.contains_key(&parameter_name) {
+    
   }
 
   unimplemented!()
@@ -270,9 +289,10 @@ fn verify_generic(payload_json: Json, parameter_name: String) -> bool {
 mod tests {
   extern crate time;
 
-  use super::encode;
+  use super::sign;
   use super::decode;
   use super::secure_compare;
+  use super::Algorithm;
   use std::collections::BTreeMap;
   use std::time::duration::Duration;
 
@@ -284,11 +304,13 @@ mod tests {
     p1.insert("key3".to_string(), "val3".to_string());
     let secret = "secret123";
 
-    let jwt = encode(p1.clone(), secret);
-    let res = decode(jwt.as_slice(), secret, true, false);
-    assert!(res.is_ok() && !res.is_err());
-    let (_, p2) = res.ok().unwrap();
-    assert_eq!(p1, p2);
+    let alg = Algorithm::HS256;
+    let jwt1 = sign(p1.clone(), secret, Some(alg));
+    let maybe_res = decode(jwt.as_slice(), secret, true, Some(alg));
+    assert!(maybe_res.is_some());
+
+    let jwt2 = maybe_res.unwrap();
+    assert_eq!(jwt1, jwt2);
   } 
 
   #[test]
@@ -298,10 +320,11 @@ mod tests {
     p1.insert("key22".to_string(), "val2".to_string());
     let secret = "secret123";
     let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c";
-    let res = decode(jwt.as_slice(), secret, true, false);
-    assert!(res.is_ok() && !res.is_err());
-    let (_, p2) = res.ok().unwrap();
-    assert_eq!(p1, p2);
+    let maybe_res = decode(jwt.as_slice(), secret, true);
+    assert!(maybe_res.is_some());
+
+    let res = maybe_res.unwrap();
+    assert_eq!(p1, res.payload);
   }
 
   #[test]
@@ -312,9 +335,9 @@ mod tests {
     p1.insert("exp".to_string(), past.sec.to_string());
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
-    let jwt = encode(p1.clone(), secret);
-    let res = decode(jwt.as_slice(), secret, true, true);
-    assert!(!res.is_ok() && res.is_err());
+    let jwt = sign(p1.clone(), secret, None);
+    let res = decode(jwt.as_slice(), secret, true);
+    assert!(!res.is_some() && res.is_none());
   }
 
   #[test]
@@ -325,9 +348,9 @@ mod tests {
     p1.insert("exp".to_string(), past.sec.to_string());
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
-    let jwt = encode(p1.clone(), secret);
-    let res = decode(jwt.as_slice(), secret, true, false);
-    assert!(res.is_ok() && !res.is_err());
+    let jwt = sign(p1.clone(), secret, None);
+    let res = decode(jwt.as_slice(), secret, true);
+    assert!(res.is_some() && !res.is_none());
   }
   
   #[test]
