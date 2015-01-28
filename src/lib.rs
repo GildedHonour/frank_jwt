@@ -64,6 +64,15 @@ fn algorithm_to_string(alg: Algorithm) -> String {
   }
 }
 
+fn parse_algorithm(str_: &str) -> Option<Algorithm> {
+  match str_ {
+    "HS256" => Some(Algorithm::HS256),
+    "HS384" => Some(Algorithm::HS384),
+    "HS512" => Some(Algorithm::HS512),
+    _ => None
+  }
+}
+
 impl<'a> ToJson for Header<'a> {
   fn to_json(&self) -> json::Json {
     let mut map = BTreeMap::new();
@@ -74,10 +83,9 @@ impl<'a> ToJson for Header<'a> {
 }
 
 pub fn sign(header: Header, payload: BTreeMap<String, String>, secret: &str) -> String {
-  let algorithm = //get from header
-    Algorithm::HS256
-  } else {
-    maybe_algorithm.unwrap()
+  let algorithm = match parse_algorithm(header.alg) {
+    Some(x) => x,
+    None => Algorithm::HS256
   };
 
   let signing_input = get_signing_input(payload);
@@ -134,26 +142,25 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   }
 }
 
-pub fn decode<'a>(token: &str, secret: &str, perform_verification: bool, algorithm: Option<Algorithm>) -> Option<Token<'a>> {
+pub fn decode<'a>(token_str: &str, secret: &str, perform_verification: bool) -> Option<Token<'a>> {
   match decode_segments(token, perform_verification) {
     Some(header_json, payload_json, signing_input, signature) => {
       if perform_verification {
-        let res = verify(payload_json, signing_input.as_slice(), secret, signature.as_slice());
-        if !res {
-          return None
+        if (verify(payload_json, signing_input.as_slice(), secret, signature.as_slice())) {
+          let header = json_to_tree(header_json);
+          let payload = json_to_tree(payload_json);
+          Some((header, payload))
+        } else {
+          None
         }
       }
-
-      let header = json_to_tree(header_json);
-      let payload = json_to_tree(payload_json);
-      Some((header, payload))
     },
 
     None => None
   }
 }
 
-pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: &[u8]) -> bool {
+pub fn verify(token_str: &str, secret: &str, options: BTreeMap<String, String>) -> Result<Token<'a>, Error> {
   if signing_input.is_empty() || signing_input.is_whitespace() {
     return None
   }
@@ -167,11 +174,6 @@ pub fn verify(payload_json: Json, signing_input: &str, secret: &str, signature: 
   // verify_issuedat();
   // verify_jwtid();
 }
-
-//todo
-pub fn verify2<'a>(token: &str, secret: &str, payload: BTreeMap<String, String>) -> Token<'a> {
-
-} 
 
 fn decode_segments(jwt: &str, perform_verification: bool) -> Result<(Json, Json, String, Vec<u8>), Error> {
   let mut raw_segments = jwt.split_str(".");
