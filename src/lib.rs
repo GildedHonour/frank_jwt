@@ -21,7 +21,11 @@ struct Header<'a> {
 
 impl<'a> Header<'a> {
   pub fn new(alg: Algorithm) -> Header<'a> {
-    Header{alg: algorithm_to_string(alg), typ: "JWT"}
+    Header{alg: algorithm_to_string(alg), typ: std_type()}
+  }
+
+  pub fn std_type() -> String {
+    "JWT"
   }
 }
 
@@ -65,15 +69,6 @@ fn algorithm_to_string(alg: Algorithm) -> String {
   }
 }
 
-fn parse_algorithm(str_: &str) -> Option<Algorithm> {
-  match str_ {
-    "HS256" => Some(Algorithm::HS256),
-    "HS384" => Some(Algorithm::HS384),
-    "HS512" => Some(Algorithm::HS512),
-    _ => None
-  }
-}
-
 impl<'a> ToJson for Header<'a> {
   fn to_json(&self) -> json::Json {
     let mut map = BTreeMap::new();
@@ -83,23 +78,21 @@ impl<'a> ToJson for Header<'a> {
   }
 }
 
-pub fn sign(secret: &str, pld: Option<BTreeMap<String, String>>, alg: Option<Algorithm>) -> String {
-  let algorithm = match alg {
+pub fn sign(secret: &str, payload: Option<BTreeMap<String, String>>, algorithm: Option<Algorithm>) -> String {
+  let signing_input = get_signing_input(payload, algorithm);
+  let signature = sign_hmac(signing_input.as_slice(), secret, match algorithm {
     Some(x) => x,
     None => Algorithm::HS256
-  };
-
-  let signing_input = get_signing_input(pld);
-  let signature = sign_hmac(signing_input.as_slice(), secret, algorithm);
+  });
   format!("{}.{}", signing_input, signature)
 }
 
-fn get_signing_input(pld: Option<BTreeMap<String, String>>) -> String {
-  let header = Header{alg: "HS256", typ: "JWT"};
+fn get_signing_input(payload: Option<BTreeMap<String, String>>, algorithm: Option<Algorithm>) -> String {
+  let header = Header::new(algorithm);
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
 
-  let payload = pld.into_iter().map(|(k, v)| (k, v.to_json())).collect(); //todo - if payload is None
+  let payload = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect(); //todo - if payload is None
   let payload_json = Json::Object(payload);
   let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
 
@@ -289,7 +282,7 @@ mod tests {
     p1.insert("key3".to_string(), "val3".to_string());
 
     let secret = "secret123";
-    let jwt1 = sign(p1.clone(), secret, Some(Algorithm::HS256));
+    let jwt1 = sign(secret, Some(p1.clone()), Some(Algorithm::HS256));
     let maybe_res = verify(jwt.as_slice(), secret, None);
 
     assert!(maybe_res.is_ok());
@@ -317,7 +310,7 @@ mod tests {
     p1.insert("exp".to_string(), past.sec.to_string());
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
-    let jwt = sign(p1.clone(), secret, None);
+    let jwt = sign(secret, Some(p1.clone()), None);
     let res = verify(jwt.as_slice(), secret, None);
     assert!(res.is_ok());
   }
@@ -330,7 +323,7 @@ mod tests {
     p1.insert("exp".to_string(), past.sec.to_string());
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
-    let jwt = sign(p1.clone(), secret, None);
+    let jwt = sign(secret, Some(p1.clone()), None);
     let res = verify(jwt.as_slice(), secret, None);
     assert!(res.is_ok());
   }
