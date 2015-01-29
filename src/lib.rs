@@ -24,6 +24,7 @@ impl<'a> Header<'a> {
     Header{alg: algorithm_to_string(alg), typ: "JWT"}
   }
 }
+
 struct Token<'a> {
   header: Option<Header<'a>>,
   payload: BTreeMap<String, String>,
@@ -82,23 +83,23 @@ impl<'a> ToJson for Header<'a> {
   }
 }
 
-pub fn sign(header: Header, payload: BTreeMap<String, String>, secret: &str) -> String {
-  let algorithm = match parse_algorithm(header.alg) {
+pub fn sign(secret: &str, pld: Option<BTreeMap<String, String>>, alg: Option<Algorithm>) -> String {
+  let algorithm = match alg {
     Some(x) => x,
     None => Algorithm::HS256
   };
 
-  let signing_input = get_signing_input(payload);
+  let signing_input = get_signing_input(pld);
   let signature = sign_hmac(signing_input.as_slice(), secret, algorithm);
   format!("{}.{}", signing_input, signature)
 }
 
-fn get_signing_input(payload: BTreeMap<String, String>) -> String {
+fn get_signing_input(pld: Option<BTreeMap<String, String>>) -> String {
   let header = Header{alg: "HS256", typ: "JWT"};
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
 
-  let payload = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
+  let payload = pld.into_iter().map(|(k, v)| (k, v.to_json())).collect(); //todo - if payload is None
   let payload_json = Json::Object(payload);
   let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
 
@@ -142,25 +143,7 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   }
 }
 
-pub fn decode<'a>(token_str: &str, secret: &str, perform_verification: bool) -> Option<Token<'a>> {
-  match decode_segments(token, perform_verification) {
-    Some(header_json, payload_json, signing_input, signature) => {
-      if perform_verification {
-        if (verify(payload_json, signing_input.as_slice(), secret, signature.as_slice())) {
-          let header = json_to_tree(header_json);
-          let payload = json_to_tree(payload_json);
-          Some((header, payload))
-        } else {
-          None
-        }
-      }
-    },
-
-    None => None
-  }
-}
-
-pub fn verify(token_str: &str, secret: &str, options: BTreeMap<String, String>) -> Result<Token<'a>, Error> {
+pub fn verify(token_str: &str, secret: &str, options: Option<BTreeMap<String, String>>) -> Result<Token<'a>, Error> {
   if signing_input.is_empty() || signing_input.is_whitespace() {
     return None
   }
@@ -304,15 +287,13 @@ mod tests {
     p1.insert("key1".to_string(), "val1".to_string());
     p1.insert("key2".to_string(), "val2".to_string());
     p1.insert("key3".to_string(), "val3".to_string());
+
     let secret = "secret123";
+    let jwt1 = sign(p1.clone(), secret, Some(Algorithm::HS256));
+    let maybe_res = verify(jwt.as_slice(), secret, None);
 
-    let alg = Algorithm::HS256;
-    let jwt1 = sign(p1.clone(), secret, Some(alg));
-    let maybe_res = decode(jwt.as_slice(), secret, true, Some(alg));
-    assert!(maybe_res.is_some());
-
-    let jwt2 = maybe_res.unwrap();
-    assert_eq!(jwt1, jwt2);
+    assert!(maybe_res.is_ok());
+    assert_eq!(jwt1, maybe_res.unwrap());
   } 
 
   #[test]
@@ -322,11 +303,10 @@ mod tests {
     p1.insert("key22".to_string(), "val2".to_string());
     let secret = "secret123";
     let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c";
-    let maybe_res = decode(jwt.as_slice(), secret, true);
-    assert!(maybe_res.is_some());
-
-    let res = maybe_res.unwrap();
-    assert_eq!(p1, res.payload);
+    let maybe_res = verify(jwt.as_slice(), secret, None);
+    
+    assert!(maybe_res.is_ok());
+    assert_eq!(p1, maybe_res.unwrap().payload);
   }
 
   #[test]
@@ -338,8 +318,8 @@ mod tests {
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
     let jwt = sign(p1.clone(), secret, None);
-    let res = decode(jwt.as_slice(), secret, true);
-    assert!(!res.is_some() && res.is_none());
+    let res = verify(jwt.as_slice(), secret, None);
+    assert!(res.is_ok());
   }
 
   #[test]
@@ -351,8 +331,8 @@ mod tests {
     p1.insert("key1".to_string(), "val1".to_string());
     let secret = "secret123";
     let jwt = sign(p1.clone(), secret, None);
-    let res = decode(jwt.as_slice(), secret, true);
-    assert!(res.is_some() && !res.is_none());
+    let res = verify(jwt.as_slice(), secret, None);
+    assert!(res.is_ok());
   }
   
   #[test]
