@@ -38,7 +38,7 @@ struct Token<'a> {
 
 impl<'a> Token<'a> {
   fn new() -> Token<'a> {
-
+    unimplemented!()
   }
 
   fn segments_count() -> usize {
@@ -183,7 +183,7 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
   (header_json, payload_json)
 }
 
-fn verify_signature(algorithm: Algorithm, signing_input: &str, secret: &str, signature: &[u8]) -> bool {
+fn verify_signature(signing_input: &str, secret: &str, signature: &[u8]) -> bool {
   let mut hmac = Hmac::new(match algorithm {
       Algorithm::HS256 => Sha256::new(),
       Algorithm::HS384 => Sha384::new(),
