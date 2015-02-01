@@ -15,23 +15,43 @@ use crypto::mac::Mac;
 use std::str;
 
 struct Header<'a> {
-  alg: &'a str,
+  alg: BTreeMap<&'a str, Algorithm>,
   typ: &'a str
 }
 
 impl<'a> Header<'a> {
   pub fn new(alg: Algorithm) -> Header<'a> {
-    Header{alg: algorithm_to_string(alg), typ: std_type()}
+    let mut map = BTreeMap::new();
+    map.insert("HS256".to_string(), Algorithm::HS256);
+    Header{alg: algorithm_to_string(alg), typ: Header::std_type()}
+  }
+  
+  pub fn new(alg: &str) -> Header<'a> {
+    Header::algorithms()
+    alg_str match {
+      "HS256" => Algorithm::HS256,
+      "HS384" => Algorithm::HS384,
+      "HS512" => Algorithm::HS512,
+      _ => panic!("Unknown algorithm: {}", alg_str)
+    }
+    Header{alg: algorithm_to_string(alg), typ: Header::std_type()}
   }
 
   pub fn std_type() -> String {
     "JWT"
   }
+
+  fn algorithms() -> BTreeMap<String, Algorithm> {
+    let mut map = BTreeMap::new();
+    map.insert("HS256".to_string(), Algorithm::HS256);
+    map.insert("HS384".to_string(), Algorithm::HS384);
+    map.insert("HS512".to_string(), Algorithm::HS512);
+  }
 }
 
 struct Token<'a> {
-  header: Option<Header<'a>>,
-  payload: BTreeMap<String, String>,
+  header: Header<'a>,
+  payload: Option<BTreeMap<String, String>>,
   signature: &'a str,
   signing_input: &'a str
 }
@@ -59,14 +79,6 @@ enum Algorithm {
   HS256,
   HS384,
   HS512
-}
-
-fn algorithm_to_string(alg: Algorithm) -> String {
-  match alg {
-    Algorithm::HS256 => "HS256",
-    Algorithm::HS384 => "HS384",
-    Algorithm::HS512 => "HS512"
-  }
 }
 
 impl<'a> ToJson for Header<'a> {
@@ -136,23 +148,28 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   }
 }
 
-pub fn verify(token_str: &str, secret: &str, options: Option<BTreeMap<String, String>>) -> Result<Token<'a>, Error> {
-  if signing_input.is_empty() || signing_input.is_whitespace() {
-    return None
+pub fn verify(jwt_token: &str, secret: &str, options: Option<BTreeMap<String, String>>) -> Result<Token<'a>, Error> {
+  // if signing_input.is_empty() || signing_input.is_whitespace() {
+  //   return None
+  // }
+  match decode_segments(jwt_token, true) {
+    Ok((header, payload, signing_input, signature)) => {
+      let algorithm = 
+      verify_signature(algorithm, signing_input, secret, signature);
+      // verify_issuer(payload_json);
+      // verify_expiration(payload_json);
+      // verify_audience();
+      // verify_subject();
+      // verify_notbefore();
+      // verify_issuedat();
+      // verify_jwtid();
+    },
+    Err(err) => err
   }
-
-  verify_signature(signing_input, secret, signature);
-  // verify_issuer(payload_json);
-  // verify_expiration(payload_json);
-  // verify_audience();
-  // verify_subject();
-  // verify_notbefore();
-  // verify_issuedat();
-  // verify_jwtid();
 }
 
-fn decode_segments(jwt: &str, perform_verification: bool) -> Result<(Json, Json, String, Vec<u8>), Error> {
-  let mut raw_segments = jwt.split_str(".");
+fn decode_segments(jwt_token: &str, perform_verification: bool) -> Result<(Json, Json, String, Vec<u8>), Error> {
+  let mut raw_segments = jwt_token.split_str(".");
   if raw_segments.count() != Token::segments_count() {
     return Err(Error::JWTInvalid)
   }
@@ -171,7 +188,7 @@ fn decode_segments(jwt: &str, perform_verification: bool) -> Result<(Json, Json,
   Ok((header, payload, signing_input, signature))
 }
 
-fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Json, Json) {
+fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Header, BTreeMap<String, String>) {
   fn base64_to_json(input: &str) -> Json {
     let bytes = input.as_bytes().from_base64().unwrap();
     let s = str::from_utf8(bytes.as_slice()).unwrap();
@@ -179,11 +196,14 @@ fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> (Js
   };
 
   let header_json = base64_to_json(header_segment);
+
+
+  let header = Header::new()
   let payload_json = base64_to_json(payload_segment);
   (header_json, payload_json)
 }
 
-fn verify_signature(signing_input: &str, secret: &str, signature: &[u8]) -> bool {
+fn verify_signature(algorithm: Algorithm, signing_input: &str, secret: &str, signature: &[u8]) -> bool {
   let mut hmac = Hmac::new(match algorithm {
       Algorithm::HS256 => Sha256::new(),
       Algorithm::HS384 => Sha384::new(),
