@@ -1,4 +1,4 @@
-rust-jwt
+rust-jwt [![Build Status](https://travis-ci.org/GildedHonour/rust-jwt.svg)](https://travis-ci.org/GildedHonour/rust-jwt)
 ================================================
 
 Implementation of JSON JWT in Rust [JSON Web Tokens](http://jwt.io). It supports RS256 signature algorithm.
