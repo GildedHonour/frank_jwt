@@ -13,7 +13,6 @@ use crypto::hmac::Hmac;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
 use std::str;
-use std::from_str::FromStr;
 
 struct Header<'a> {
   alg: Algorithm,
@@ -143,17 +142,14 @@ fn base64_url_encode(bytes: &[u8]) -> String {
 fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   match input {
     Json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
-        Json::String(s) => s,
-        _ => unreachable!()
+      Json::String(s) => s,
+      _ => unreachable!()
     })).collect(),
     _ => unreachable!()
   }
 }
 
 pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, String>) -> Result<Token<'a>, Error> {
-  // if signing_input.is_empty() || signing_input.is_whitespace() {
-  //   return None
-  // }
   match decode_segments(jwt_token, true) {
     Ok((header, payload, signing_input, signature)) => {
       if !verify_signature(header.alg, signing_input, signature.as_slice(), secret) {
@@ -175,7 +171,7 @@ pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, Strin
   }
 }
 
-fn decode_segments(jwt_token: &str, perform_verification: bool) -> Result<(Header, BTreeMap<String, String>, String, Vec<u8>), Error> {
+fn decode_segments(jwt_token: &str, perform_verification: bool) -> Result<Token<'a>, Error> {
   let mut raw_segments = jwt_token.split_str(".");
   if raw_segments.count() != Token::segments_count() {
     return Err(Error::JWTInvalid)
@@ -185,17 +181,12 @@ fn decode_segments(jwt_token: &str, perform_verification: bool) -> Result<(Heade
   let payload_segment = raw_segments.next().unwrap();
   let crypto_segment =  raw_segments.next().unwrap();
   let (header, payload) = decode_header_and_payload(header_segment, payload_segment);
-  let signature = if perform_verification {
-    crypto_segment.as_bytes().from_base64().unwrap()
-  } else {
-    vec![]
-  };
-
+  let signature = crypto_segment.as_bytes().from_base64().unwrap();
   let signing_input = format!("{}.{}", header_segment, payload_segment);
-  Ok((header, payload, signing_input, signature))
+  Ok(Token{header: header, payload: '', signature: '', signing_input: ''}) //todo
 }
 
-fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header<'a>, BTreeMap<String, String>) {
+fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header<'a>, Payload) {
   fn base64_to_json(input: &str) -> Json {
     let bytes = input.as_bytes().from_base64().unwrap();
     let s = str::from_utf8(bytes.as_slice()).unwrap();
@@ -250,7 +241,7 @@ fn verify_issuer(payload_json: Json, iss: &str) -> bool {
 fn verify_expiration(payload_json: Json) -> bool {
   let payload = json_to_tree(payload_json);
   if payload.contains_key("exp") {
-    match payload.get("exp").unwrap().parse()::<i64>() {
+    match payload.get("exp").unwrap().parse::<i64>() {
       Some(exp) => exp > time::get_time().sec,
       None => panic!()
     }
