@@ -151,10 +151,12 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
 
 pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, String>) -> Result<Token<'a>, Error> {
   match decode_segments(jwt_token, true) {
-    Ok((header, payload, signing_input, signature)) => {
-      if !verify_signature(header.alg, signing_input, signature.as_slice(), secret) {
+    Ok(token) => {
+      if !verify_signature(token.header.alg, token.signing_input, token.signature, secret) {
         Err(Error::SignatureInvalid)
       }
+
+      //todo
       // verify_issuer(payload_json);
       // verify_expiration(payload_json);
       // verify_audience();
@@ -163,7 +165,7 @@ pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, Strin
       // verify_issuedat();
       // verify_jwtid();
 
-      let token = Token::new();
+      //todo
       Ok(token)
     },
 
@@ -171,7 +173,7 @@ pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, Strin
   }
 }
 
-fn decode_segments(jwt_token: &str, perform_verification: bool) -> Result<Token<'a>, Error> {
+fn decode_segments<'a>(jwt_token: &str, perform_verification: bool) -> Result<Token<'a>, Error> {
   let mut raw_segments = jwt_token.split_str(".");
   if raw_segments.count() != Token::segments_count() {
     return Err(Error::JWTInvalid)
@@ -183,7 +185,7 @@ fn decode_segments(jwt_token: &str, perform_verification: bool) -> Result<Token<
   let (header, payload) = decode_header_and_payload(header_segment, payload_segment);
   let signature = crypto_segment.as_bytes().from_base64().unwrap();
   let signing_input = format!("{}.{}", header_segment, payload_segment);
-  Ok(Token{header: header, payload: '', signature: '', signing_input: ''}) //todo
+  Ok(Token{header: header, payload: "", signature: "", signing_input: ""}) //todo
 }
 
 fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header<'a>, Payload) {
@@ -195,7 +197,8 @@ fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) ->
 
   let header_json = base64_to_json(header_segment);
   let header_tree = json_to_tree(header_json);
-  let header = Header::new2(header_tree.get("alg").unwrap().as_slice());
+  let alg = header_tree.get("alg").unwrap().as_slice();
+  let header = Header::new2(alg);
   let payload_json = base64_to_json(payload_segment);
   let payload = json_to_tree(payload_json);
   (header, payload)
