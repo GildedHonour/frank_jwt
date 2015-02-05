@@ -183,9 +183,14 @@ fn decode_segments<'a>(jwt_token: &str, perform_verification: bool) -> Result<To
   let payload_segment = raw_segments.next().unwrap();
   let crypto_segment =  raw_segments.next().unwrap();
   let (header, payload) = decode_header_and_payload(header_segment, payload_segment);
-  let signature = crypto_segment.as_bytes().from_base64().unwrap();
-  let signing_input = format!("{}.{}", header_segment, payload_segment);
-  Ok(Token{header: header, payload: "", signature: "", signing_input: ""}) //todo
+  let signature = crypto_segment.as_bytes().from_base64().unwrap().as_slice();
+  match str::from_utf8(signature) {
+    Ok(x) => {
+      let signing_input = format!("{}.{}", header_segment, payload_segment);
+      Ok(Token{header: header, payload: payload, signature: x, signing_input: signing_input.as_slice()}) //todo create "new"
+    },
+    Err(_) => panic!("Invalid char sequence")
+  }
 }
 
 fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header<'a>, Payload) {

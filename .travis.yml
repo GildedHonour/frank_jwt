@@ -1,5 +1,4 @@
 language: rust
-script:
-  - cargo clean
-  - cargo build --verbose
-  - cargo test --verbose
+
+notifications:
+  email: false
