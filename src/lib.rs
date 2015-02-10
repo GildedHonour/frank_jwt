@@ -1,7 +1,12 @@
+#![feature(std_misc)]
+#![feature(io)]
 extern crate serialize;
 extern crate time;
-extern crate "crypto" as crypto;
+// extern crate "crypto" as crypto;
+extern crate crypto;
 
+
+use std::time::duration::Duration;
 use serialize::base64;
 use serialize::base64::{ToBase64, FromBase64};
 use serialize::json;
@@ -125,12 +130,14 @@ fn sign_hmac512(signing_input: &str, secret: &str) -> String {
 }
 
 fn sign_hmac(signing_input: &str, secret: &str, algorithm: Algorithm) -> String {
-  let mut hmac = Hmac::new(match algorithm {
-      Algorithm::HS256 => Sha256::new(),
-      Algorithm::HS384 => Sha384::new(),
-      Algorithm::HS512 => Sha512::new()
-    }, secret.to_string().as_bytes()
-  );
+  let mut hmac = match algorithm {
+    Algorithm::HS256 => create_hmac(Sha256::new(), secret),
+    Algorithm::HS384 => create_hmac(Sha384::new(), secret),
+    Algorithm::HS512 => create_hmac(Sha512::new(), secret),
+    _ => panic!()
+  };
+
+  
   hmac.input(signing_input.to_string().as_bytes());
   base64_url_encode(hmac.result().code())
 }
@@ -153,7 +160,7 @@ pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, Strin
   match decode_segments(jwt_token, true) {
     Ok(token) => {
       if !verify_signature(token.header.alg, token.signing_input, token.signature, secret) {
-        Err(Error::SignatureInvalid)
+        return Err(Error::SignatureInvalid)
       }
 
       //todo
@@ -210,13 +217,12 @@ fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) ->
 }
 
 fn verify_signature(algorithm: Algorithm, signing_input: &str, signature: &[u8], secret: &str) -> bool {
-  let mut hmac = Hmac::new(match algorithm {
-      Algorithm::HS256 => Sha256::new(),
-      Algorithm::HS384 => Sha384::new(),
-      Algorithm::HS512 => Sha512::new(),
-      _ => panic!()
-    }, secret.to_string().as_bytes()
-  );
+  let mut hmac = match algorithm {
+    Algorithm::HS256 => create_hmac(Sha256::new(), secret),
+    Algorithm::HS384 => create_hmac(Sha384::new(), secret),
+    Algorithm::HS512 => create_hmac(Sha512::new(), secret),
+    _ => panic!()
+  };
 
   hmac.input(signing_input.to_string().as_bytes());
   secure_compare(signature, hmac.result().code())
@@ -290,6 +296,10 @@ fn verify_generic(payload_json: Json, parameter_name: String) -> bool {
   }
 
   unimplemented!()
+}
+
+fn create_hmac<'a, D: Digest + 'a>(digest: D, some_str: &'a str) -> Box<Mac + 'a> {
+  Box::new(Hmac::new(digest, some_str.to_string().as_bytes()))
 }
 
 #[cfg(test)]
