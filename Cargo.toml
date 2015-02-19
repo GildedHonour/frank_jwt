@@ -11,9 +11,8 @@ readme = "README.md"
 
 [dependencies]
 rust-crypto = "*"
-
-[dependencies.time]
-git = "https://github.com/rust-lang/time"
+rustc-serialize = "0.2"
+time = "0.1.17"
 
 [lib]
 name = "jwt"

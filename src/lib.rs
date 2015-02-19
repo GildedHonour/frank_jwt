@@ -1,17 +1,16 @@
-#![feature(std_misc)]
-#![feature(io)]
-extern crate serialize;
+extern crate "rustc-serialize" as rustc_serialize;
 extern crate time;
-// extern crate "crypto" as crypto;
 extern crate crypto;
 
 
+
+
 use std::time::duration::Duration;
-use serialize::base64;
-use serialize::base64::{ToBase64, FromBase64};
-use serialize::json;
-use serialize::json::ToJson;
-use serialize::json::Json;
+use rustc_serialize::base64;
+use rustc_serialize::base64::{ToBase64, FromBase64};
+use rustc_serialize::json;
+use rustc_serialize::json::ToJson;
+use rustc_serialize::json::Json;
 use std::collections::BTreeMap;
 use crypto::sha2::{Sha256, Sha384, Sha512};
 use crypto::hmac::Hmac;
@@ -204,7 +203,7 @@ fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) ->
   fn base64_to_json(input: &str) -> Json {
     let bytes = input.as_bytes().from_base64().unwrap();
     let s = str::from_utf8(bytes.as_slice()).unwrap();
-    json::from_str(s).unwrap()
+    Json::from_str(s).unwrap()
   };
 
   let header_json = base64_to_json(header_segment);
