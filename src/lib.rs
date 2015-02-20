@@ -2,15 +2,11 @@ extern crate "rustc-serialize" as rustc_serialize;
 extern crate time;
 extern crate crypto;
 
-
-
-
 use std::time::duration::Duration;
 use rustc_serialize::base64;
 use rustc_serialize::base64::{ToBase64, FromBase64};
 use rustc_serialize::json;
-use rustc_serialize::json::ToJson;
-use rustc_serialize::json::Json;
+use rustc_serialize::json::{ToJson, Json};
 use std::collections::BTreeMap;
 use crypto::sha2::{Sha256, Sha384, Sha512};
 use crypto::hmac::Hmac;
@@ -18,17 +14,17 @@ use crypto::digest::Digest;
 use crypto::mac::Mac;
 use std::str;
 
-struct Header<'a> {
+struct Header {
   alg: Algorithm,
-  typ: &'a str
+  typ: String
 }
 
-impl<'a> Header<'a> {
-  pub fn new(alg: Algorithm) -> Header<'a> {
-    Header{alg: alg, typ: Header::std_type()}
+impl Header {
+  pub fn new(alg: Algorithm) -> Header {
+    Header { alg: alg, typ: Header::std_type() }
   }
   
-  pub fn new2(alg: &str) -> Header<'a> {
+  pub fn new2(alg: &str) -> Header {
     match Header::algorithms().get(alg) {
       Some(x) => Header::new(*x),
       None => panic!("Unknown algorithm: {}", alg)
@@ -39,34 +35,27 @@ impl<'a> Header<'a> {
     "JWT".to_string()
   }
 
-  pub fn alg_str(&self) -> String {
-    for (key, value) in Header::algorithms().iter() {
-      if value == self.alg {
-        key
-      }
-    }
-
-    unreachable!()
-  }
-
   fn algorithms() -> BTreeMap<String, Algorithm> {
     let mut map = BTreeMap::new();
     map.insert("HS256".to_string(), Algorithm::HS256);
     map.insert("HS384".to_string(), Algorithm::HS384);
     map.insert("HS512".to_string(), Algorithm::HS512);
+    map
   }
 }
 
-struct Payload;
-
-struct Token<'a> {
-  header: Header<'a>,
-  payload: Payload,
-  signature: &'a str,
-  signing_input: &'a str
+struct Payload {
+  items: BTreeMap<String, String>
 }
 
-impl<'a> Token<'a> {
+pub struct Token {
+  header: Header,
+  payload: Payload,
+  signature: String,
+  signing_input: String
+}
+
+impl Token {
   fn segments_count() -> usize {
     3
   }
@@ -81,24 +70,30 @@ pub enum Error {
   AudienceInvalid
 }
 
-enum Algorithm {
+pub enum Algorithm {
   HS256,
   HS384,
   HS512
 }
 
-impl<'a> ToJson for Header<'a> {
+impl ToString for Algorithm {
+  fn to_string(&self) -> String {
+    unimplemented!() 
+  }
+}
+
+impl ToJson for Header {
   fn to_json(&self) -> json::Json {
     let mut map = BTreeMap::new();
     map.insert("typ".to_string(), self.typ.to_json());
-    map.insert("alg".to_string(), self.alg_str().to_json());
+    map.insert("alg".to_string(), self.alg.to_string().to_json());
     Json::Object(map)
   }
 }
 
-pub fn sign(secret: &str, payload: BTreeMap<String, String>, algorithm: Option<Algorithm>) -> String {
+pub fn sign(secret: String, payload: BTreeMap<String, String>, algorithm: Option<Algorithm>) -> String {
   let signing_input = get_signing_input(payload, algorithm);
-  let signature = sign_hmac(signing_input.as_slice(), secret, algorithm.unwrap_or(Algorithm::HS256));
+  let signature = sign_hmac(signing_input, secret, algorithm.unwrap_or(Algorithm::HS256));
   format!("{}.{}", signing_input, signature)
 }
 
@@ -106,36 +101,30 @@ fn get_signing_input(payload: BTreeMap<String, String>, algorithm: Option<Algori
   let header = Header::new(algorithm.unwrap_or(Algorithm::HS256));
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
-  if !payload.is_empty() {
-    let payload2 = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
-    let payload_json = Json::Object(payload2);
-    let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
-    format!("{}.{}", encoded_header, encoded_payload)
-  } else {
-
-  }
+  let p = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
+  let payload_json = Json::Object(p);
+  let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
+  format!("{}.{}", encoded_header, encoded_payload)
 }
 
-fn sign_hmac256(signing_input: &str, secret: &str) -> String {
+fn sign_hmac256(signing_input: String, secret: String) -> String {
   sign_hmac(signing_input, secret, Algorithm::HS256)
 }
 
-fn sign_hmac384(signing_input: &str, secret: &str) -> String {
+fn sign_hmac384(signing_input: String, secret: String) -> String {
   sign_hmac(signing_input, secret, Algorithm::HS384)
 }
 
-fn sign_hmac512(signing_input: &str, secret: &str) -> String {
+fn sign_hmac512(signing_input: String, secret: String) -> String {
   sign_hmac(signing_input, secret, Algorithm::HS512)
 }
 
-fn sign_hmac(signing_input: &str, secret: &str, algorithm: Algorithm) -> String {
+fn sign_hmac(signing_input: String, secret: String, algorithm: Algorithm) -> String {
   let mut hmac = match algorithm {
     Algorithm::HS256 => create_hmac(Sha256::new(), secret),
     Algorithm::HS384 => create_hmac(Sha384::new(), secret),
-    Algorithm::HS512 => create_hmac(Sha512::new(), secret),
-    _ => panic!()
+    Algorithm::HS512 => create_hmac(Sha512::new(), secret)
   };
-
   
   hmac.input(signing_input.to_string().as_bytes());
   base64_url_encode(hmac.result().code())
@@ -155,10 +144,10 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   }
 }
 
-pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, String>) -> Result<Token<'a>, Error> {
+pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, String>) -> Result<Token, Error> {
   match decode_segments(jwt_token, true) {
     Ok(token) => {
-      if !verify_signature(token.header.alg, token.signing_input, token.signature, secret) {
+      if !verify_signature(token.header.alg, token.signing_input, token.signature.as_bytes(), secret.to_string()) {
         return Err(Error::SignatureInvalid)
       }
 
@@ -179,7 +168,7 @@ pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, Strin
   }
 }
 
-fn decode_segments<'a>(jwt_token: &str, perform_verification: bool) -> Result<Token<'a>, Error> {
+fn decode_segments<'a>(jwt_token: &str, perform_verification: bool) -> Result<Token, Error> {
   let mut raw_segments = jwt_token.split_str(".");
   if raw_segments.count() != Token::segments_count() {
     return Err(Error::JWTInvalid)
@@ -193,13 +182,13 @@ fn decode_segments<'a>(jwt_token: &str, perform_verification: bool) -> Result<To
   match str::from_utf8(signature) {
     Ok(x) => {
       let signing_input = format!("{}.{}", header_segment, payload_segment);
-      Ok(Token{header: header, payload: payload, signature: x, signing_input: signing_input.as_slice()}) //todo create "new"
+      Ok(Token { header: header, payload: payload, signature: x.to_string(), signing_input: signing_input }) //todo create "new"
     },
     Err(_) => panic!("Invalid char sequence")
   }
 }
 
-fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header<'a>, Payload) {
+fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header, Payload) {
   fn base64_to_json(input: &str) -> Json {
     let bytes = input.as_bytes().from_base64().unwrap();
     let s = str::from_utf8(bytes.as_slice()).unwrap();
@@ -211,16 +200,15 @@ fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) ->
   let alg = header_tree.get("alg").unwrap().as_slice();
   let header = Header::new2(alg);
   let payload_json = base64_to_json(payload_segment);
-  let payload = json_to_tree(payload_json);
+  let payload = Payload { items: json_to_tree(payload_json) };
   (header, payload)
 }
 
-fn verify_signature(algorithm: Algorithm, signing_input: &str, signature: &[u8], secret: &str) -> bool {
+fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8], secret: String) -> bool {
   let mut hmac = match algorithm {
     Algorithm::HS256 => create_hmac(Sha256::new(), secret),
     Algorithm::HS384 => create_hmac(Sha384::new(), secret),
-    Algorithm::HS512 => create_hmac(Sha512::new(), secret),
-    _ => panic!()
+    Algorithm::HS512 => create_hmac(Sha512::new(), secret)
   };
 
   hmac.input(signing_input.to_string().as_bytes());
@@ -255,8 +243,8 @@ fn verify_expiration(payload_json: Json) -> bool {
   let payload = json_to_tree(payload_json);
   if payload.contains_key("exp") {
     match payload.get("exp").unwrap().parse::<i64>() {
-      Some(exp) => exp > time::get_time().sec,
-      None => panic!()
+      Ok(exp) => exp > time::get_time().sec,
+      Err(e) => panic!(e)
     }
     // if exp.is_empty() || signing_input.as_slice().is_whitespace() {
     //  return false
@@ -297,8 +285,8 @@ fn verify_generic(payload_json: Json, parameter_name: String) -> bool {
   unimplemented!()
 }
 
-fn create_hmac<'a, D: Digest + 'a>(digest: D, some_str: &'a str) -> Box<Mac + 'a> {
-  Box::new(Hmac::new(digest, some_str.to_string().as_bytes()))
+fn create_hmac<'a, D: Digest + 'a>(digest: D, some_str: String) -> Box<Mac + 'a> {
+  Box::new(Hmac::new(digest, some_str.as_bytes()))
 }
 
 #[cfg(test)]
