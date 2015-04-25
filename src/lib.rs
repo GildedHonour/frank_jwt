@@ -144,7 +144,7 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   }
 }
 
-pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, String>) -> Result<Token, Error> {
+pub fn verify(jwt_token: String, secret: String, options: BTreeMap<String, String>) -> Result<Token, Error> {
   match decode_segments(jwt_token, true) {
     Ok(token) => {
       if !verify_signature(token.header.alg, token.signing_input, token.signature.as_bytes(), secret.to_string()) {
@@ -168,7 +168,7 @@ pub fn verify<'a>(jwt_token: &str, secret: &str, options: BTreeMap<String, Strin
   }
 }
 
-fn decode_segments<'a>(jwt_token: &str, perform_verification: bool) -> Result<Token, Error> {
+fn decode_segments(jwt_token: String, perform_verification: bool) -> Result<Token, Error> {
   let mut raw_segments = jwt_token.split_str(".");
   if raw_segments.count() != Token::segments_count() {
     return Err(Error::JWTInvalid)
@@ -178,8 +178,12 @@ fn decode_segments<'a>(jwt_token: &str, perform_verification: bool) -> Result<To
   let payload_segment = raw_segments.next().unwrap();
   let crypto_segment =  raw_segments.next().unwrap();
   let (header, payload) = decode_header_and_payload(header_segment, payload_segment);
-  let signature = crypto_segment.as_bytes().from_base64().unwrap().as_slice();
-  match str::from_utf8(signature) {
+  // let signature = crypto_segment.as_bytes().from_base64().unwrap().as_slice();
+  let signature = crypto_segment.as_bytes();
+  let signature2 = signature.from_base64();
+  let signature3 = signature2.unwrap();
+  let signature4 = signature3.as_slice();
+  match str::from_utf8(signature4) {
     Ok(x) => {
       let signing_input = format!("{}.{}", header_segment, payload_segment);
       Ok(Token { header: header, payload: payload, signature: x.to_string(), signing_input: signing_input }) //todo create "new"
