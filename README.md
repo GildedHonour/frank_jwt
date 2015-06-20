@@ -1,5 +1,4 @@
 ### Attention
-The project isn't maintained until Rust 1.0 stable release comes out. 
 
 rust-jwt [![Build Status](https://travis-ci.org/GildedHonour/rust-jwt.svg)](https://travis-ci.org/GildedHonour/rust-jwt)
 ================================================

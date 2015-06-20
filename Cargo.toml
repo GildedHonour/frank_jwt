@@ -1,6 +1,6 @@
 [package]
 name = "jwt"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
 license = "MIT/Apache-2.0"
 homepage = "https://github.com/GildedHonour/rust-jwt"
@@ -11,8 +11,8 @@ readme = "README.md"
 
 [dependencies]
 rust-crypto = "*"
-rustc-serialize = "0.2"
-time = "0.1.17"
+rustc-serialize = "0.3.15"
+time = "0.1.26"
 
 [lib]
 name = "jwt"
