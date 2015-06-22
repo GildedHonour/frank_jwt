@@ -2,7 +2,7 @@ extern crate rustc_serialize;
 extern crate time;
 extern crate crypto;
 
-use std::time::duration::Duration;
+// use std::time::duration::Duration;
 use rustc_serialize::base64;
 use rustc_serialize::base64::{ToBase64, FromBase64};
 use rustc_serialize::json;
@@ -29,10 +29,9 @@ impl Header {
   pub fn std_type() -> String {
     "JWT".to_string()
   }
-
-  
 }
 
+#[derive(Clone, Copy)]
 pub enum Algorithm {
   HS256,
   HS384,
@@ -68,8 +67,8 @@ impl ToJson for Header {
 
  
 pub fn encode(header: Header, secret: String, payload: Payload) -> String {
-  let signing_input = get_signing_input(payload, header.algorithm);
-  let signature = sign_hmac(signing_input, secret, header.algorithm);
+  let signing_input = get_signing_input(payload, &header.algorithm);
+  let signature = sign_hmac(&signing_input, secret, header.algorithm);
   format!("{}.{}", signing_input, signature)
 }
 
@@ -113,8 +112,8 @@ fn segments_count() -> usize {
   3
 }
 
-fn get_signing_input(payload: Payload, algorithm: Algorithm) -> String {
-  let header = Header::new(algorithm);
+fn get_signing_input(payload: Payload, algorithm: &Algorithm) -> String {
+  let header = Header::new(*algorithm);
   let header_json_str = header.to_json();
   let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
   let p = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
@@ -123,19 +122,19 @@ fn get_signing_input(payload: Payload, algorithm: Algorithm) -> String {
   format!("{}.{}", encoded_header, encoded_payload)
 }
 
-fn sign_hmac256(signing_input: String, secret: String) -> String {
-  sign_hmac(signing_input, secret, Algorithm::HS256)
-}
+// fn sign_hmac256(signing_input: String, secret: String) -> String {
+//   sign_hmac(signing_input, secret, Algorithm::HS256)
+// }
 
-fn sign_hmac384(signing_input: String, secret: String) -> String {
-  sign_hmac(signing_input, secret, Algorithm::HS384)
-}
+// fn sign_hmac384(signing_input: String, secret: String) -> String {
+//   sign_hmac(signing_input, secret, Algorithm::HS384)
+// }
 
-fn sign_hmac512(signing_input: String, secret: String) -> String {
-  sign_hmac(signing_input, secret, Algorithm::HS512)
-}
+// fn sign_hmac512(signing_input: String, secret: String) -> String {
+//   sign_hmac(signing_input, secret, Algorithm::HS512)
+// }
 
-fn sign_hmac(signing_input: String, secret: String, algorithm: Algorithm) -> String {
+fn sign_hmac(signing_input: &str, secret: String, algorithm: Algorithm) -> String {
   let mut hmac = match algorithm {
     Algorithm::HS256 => create_hmac(Sha256::new(), secret),
     Algorithm::HS384 => create_hmac(Sha384::new(), secret),
@@ -161,7 +160,7 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
 }
 
 fn decode_segments(encoded_token: String, perform_verification: bool) -> Option<(Header, Payload, String, String)> {
-  let mut raw_segments: Vec<&str> = encoded_token.split(".").collect();
+  let raw_segments: Vec<&str> = encoded_token.split(".").collect();
   if raw_segments.len() != segments_count() {
     return None
   }
@@ -175,7 +174,7 @@ fn decode_segments(encoded_token: String, perform_verification: bool) -> Option<
   let signature = crypto_segment.as_bytes();
   let signature2 = signature.from_base64();
   let signature3 = signature2.unwrap();
-  let signature4 = signature3.as_slice();
+  let signature4 = &signature3;
   match str::from_utf8(signature4) {
     Ok(x) => {
       let signing_input = format!("{}.{}", header_segment, payload_segment);
@@ -188,7 +187,7 @@ fn decode_segments(encoded_token: String, perform_verification: bool) -> Option<
 fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header, Payload) {
   fn base64_to_json(input: &str) -> Json {
     let bytes = input.as_bytes().from_base64().unwrap();
-    let s = str::from_utf8(bytes.as_slice()).unwrap();
+    let s = str::from_utf8(&bytes).unwrap();
     Json::from_str(s).unwrap()
   };
 
