@@ -2,7 +2,7 @@ extern crate rustc_serialize;
 extern crate time;
 extern crate crypto;
 
-// use std::time::duration::Duration;
+use time::Duration;
 use rustc_serialize::base64;
 use rustc_serialize::base64::{ToBase64, FromBase64};
 use rustc_serialize::json;
@@ -298,16 +298,17 @@ fn create_hmac<'a, D: Digest + 'a>(digest: D, some_str: String) -> Box<Mac + 'a>
 
 
 
-// #[cfg(test)]
-// mod tests {
-//   extern crate time;
+#[cfg(test)]
+mod tests {
+  extern crate time;
 
-//   use super::sign;
-//   use super::verify;
-//   use super::secure_compare;
-//   use super::Algorithm;
-//   use std::collections::BTreeMap;
-//   use std::time::duration::Duration;
+  use super::encode;
+  use super::verify;
+  use super::secure_compare;
+  use super::Algorithm;
+  use super::Header;
+  use std::collections::BTreeMap;
+  use time::Duration;
 
 //   #[test]
 //   fn test_encode_and_decode_jwt() {
@@ -383,4 +384,4 @@ fn create_hmac<'a, D: Digest + 'a>(digest: D, some_str: String) -> Box<Mac + 'a>
 //     let res2 = secure_compare(str3, str4);
 //     assert!(!res2);
 //   }
-// }
+}
