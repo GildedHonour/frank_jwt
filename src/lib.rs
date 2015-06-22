@@ -161,14 +161,14 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
 }
 
 fn decode_segments(encoded_token: String, perform_verification: bool) -> Option<(Header, Payload, String, String)> {
-  let mut raw_segments = encoded_token.split(".");
-  if raw_segments.count() != segments_count() {
+  let mut raw_segments: Vec<&str> = encoded_token.split(".").collect();
+  if raw_segments.len() != segments_count() {
     return None
   }
 
-  let header_segment = raw_segments.next().unwrap();
-  let payload_segment = raw_segments.next().unwrap();
-  let crypto_segment =  raw_segments.next().unwrap();
+  let header_segment = raw_segments[0];
+  let payload_segment = raw_segments[1];
+  let crypto_segment =  raw_segments[2];
   let (header, payload) = decode_header_and_payload(header_segment, payload_segment);
 
   // let signature = crypto_segment.as_bytes().from_base64().unwrap().as_slice();
