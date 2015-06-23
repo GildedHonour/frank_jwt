@@ -6,11 +6,10 @@ rust-jwt [![Build Status](https://travis-ci.org/GildedHonour/rust-jwt.svg)](http
 Implementation of JSON JWT in Rust [JSON Web Tokens](http://jwt.io). It supports RS256 signature algorithm.
 
 
-
 ## Example
 
 ```
-let mut payload = TreeMap::new();
+let mut payload = Payload::new();
 payload.insert("key1".to_string(), "val1".to_string());
 payload.insert("key2".to_string(), "val2".to_string());
 payload.insert("key3".to_string(), "val3".to_string());
