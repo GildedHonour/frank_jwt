@@ -1,5 +1,3 @@
-### Attention
-
 rust-jwt [![Build Status](https://travis-ci.org/GildedHonour/rust-jwt.svg)](https://travis-ci.org/GildedHonour/rust-jwt)
 ================================================
 
