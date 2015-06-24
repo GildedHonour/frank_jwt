@@ -17,7 +17,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use std::fmt::Debug;
 
-pub type Payload = BTreeMap<String, String>;
+pub type Payload = BTreeMap<String, String>; //todo replace with &str
 
 pub struct Header {
   algorithm: Algorithm,
@@ -212,9 +212,6 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
 fn create_hmac<'a, D: Digest + 'a>(digest: D, some_str: String) -> Box<Mac + 'a> {
   Box::new(Hmac::new(digest, some_str.as_bytes()))
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
