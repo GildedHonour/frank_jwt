@@ -224,7 +224,6 @@ mod tests {
   use super::encode;
   use super::decode;
   use super::Algorithm;
-
   use super::secure_compare;
 
   #[test]
@@ -252,6 +251,22 @@ mod tests {
     assert!(maybe_res.is_ok());
   }
 
+  #[test]
+  fn test_secure_compare_same_strings() {
+    let str1 = "same same".as_bytes();
+    let str2 = "same same".as_bytes();
+    let res = secure_compare(str1, str2);
+    assert!(res);
+  }
+
+  #[test]
+  fn test_fails_when_secure_compare_different_strings() {
+    let str1 = "same same".as_bytes();
+    let str2 = "same same but different".as_bytes();
+    let res = secure_compare(str1, str2);
+    assert!(!res);
+  }
+
 //   #[test]
 //   fn test_fails_when_expired() {
 //     let now = time::get_time();
@@ -276,26 +291,5 @@ mod tests {
 //     let jwt = sign(secret, Some(p1.clone()), None);
 //     let res = verify(jwt.as_slice(), secret, None);
 //     assert!(res.is_ok());
-//   }
-  
-//   #[test]
-//   fn test_secure_compare_same_strings() {
-//     let str1 = "same same".as_bytes();
-//     let str2 = "same same".as_bytes();
-//     let res = secure_compare(str1, str2);
-//     assert!(res);
-//   }
-
-//   #[test]
-//   fn test_fails_when_secure_compare_different_strings() {
-//     let str1 = "same same".as_bytes();
-//     let str2 = "same same but different".as_bytes();
-//     let res = secure_compare(str1, str2);
-//     assert!(!res);
-
-//     let str3 = "same same".as_bytes();
-//     let str4 = "same ssss".as_bytes();
-//     let res2 = secure_compare(str3, str4);
-//     assert!(!res2);
 //   }
 }
