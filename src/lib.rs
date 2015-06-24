@@ -162,16 +162,10 @@ fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) ->
   };
 
   let header_json = base64_to_json(header_segment);
-
-  println!("header_json {:?}", header_json);
-
   let header_tree = json_to_tree(header_json);
   let alg = header_tree.get("alg").unwrap();
   let header = Header::new(parse_algorithm(alg));
   let payload_json = base64_to_json(payload_segment);
-
-  println!("payload_json {:?}", payload_json);
-
   let payload = json_to_tree(payload_json);
   (header, payload)
 }
