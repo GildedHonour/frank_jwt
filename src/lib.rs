@@ -261,6 +261,35 @@ mod tests {
     assert!(!res);
   }
 
+
+  #[test]
+  fn test_encode_and_decode_jwt_hs384() {
+    let mut p1 =  Payload::new();
+    p1.insert("key1".to_string(), "val1".to_string());
+    p1.insert("key2".to_string(), "val2".to_string());
+    p1.insert("key3".to_string(), "val3".to_string());
+
+    let secret = "secret123";
+    let header = Header::new(Algorithm::HS384);
+    let jwt1 = encode(header, secret.to_string(), p1.clone());
+    let maybe_res = decode(jwt1, secret.to_string(), Algorithm::HS384);
+    assert!(maybe_res.is_ok());
+  }
+
+    #[test]
+  fn test_encode_and_decode_jwt_hs512() {
+    let mut p1 =  Payload::new();
+    p1.insert("key12".to_string(), "val1".to_string());
+    p1.insert("key22".to_string(), "val2".to_string());
+    p1.insert("key33".to_string(), "val3".to_string());
+
+    let secret = "secret123456";
+    let header = Header::new(Algorithm::HS512);
+    let jwt1 = encode(header, secret.to_string(), p1.clone());
+    let maybe_res = decode(jwt1, secret.to_string(), Algorithm::HS512);
+    assert!(maybe_res.is_ok());
+  }
+
 //   #[test]
 //   fn test_fails_when_expired() {
 //     let now = time::get_time();
