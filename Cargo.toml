@@ -2,7 +2,7 @@
 name = "jwt"
 version = "2.0.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
-license = "MIT/Apache-2.0"
+license = "Apache-2.0"
 homepage = "https://github.com/GildedHonour/rust-jwt"
 repository = "https://github.com/GildedHonour/rust-jwt"
 description = "Implementation of JSON JWT"
