@@ -26,7 +26,7 @@ use jwt::Algorithm;
 
 ## Example
 
-```
+```rust
 let mut payload = Payload::new();
 payload.insert("key1".to_string(), "val1".to_string());
 payload.insert("key2".to_string(), "val2".to_string());
@@ -40,7 +40,7 @@ let jwt = encode(header, secret.to_string(), payload.clone());
 
 ## License
 
-It's dually licensed - MIT and Apache 2.0 like the Rust compiler itself.
+Apache 2.0
 
 ## Tests
 
