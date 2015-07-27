@@ -38,7 +38,8 @@ impl Header {
 pub enum Algorithm {
   HS256,
   HS384,
-  HS512
+  HS512,
+  RS256
 }
 
 impl ToString for Algorithm {
@@ -46,7 +47,8 @@ impl ToString for Algorithm {
     match *self {
       Algorithm::HS256 => "HS256".to_string(),
       Algorithm::HS384 => "HS384".to_string(),
-      Algorithm::HS512 => "HS512".to_string()
+      Algorithm::HS512 => "HS512".to_string(),
+      Algorithm::RS256 => "RS256".to_string()
     } 
   }
 }
@@ -117,7 +119,8 @@ fn sign_hmac(signing_input: &str, secret: String, algorithm: Algorithm) -> Strin
   let mut hmac = match algorithm {
     Algorithm::HS256 => create_hmac(Sha256::new(), secret),
     Algorithm::HS384 => create_hmac(Sha384::new(), secret),
-    Algorithm::HS512 => create_hmac(Sha512::new(), secret)
+    Algorithm::HS512 => create_hmac(Sha512::new(), secret),
+    Algorithm::RS256 => unimplemented!()
   };
   
   hmac.input(signing_input.as_bytes());
@@ -175,6 +178,7 @@ fn parse_algorithm(alg: &str) -> Algorithm {
     "HS256" => Algorithm::HS256,
     "HS384" => Algorithm::HS384,
     "HS512" => Algorithm::HS512,
+    "RS256" => Algorithm::HS512,
     _ => panic!("Unknown algorithm")
   }
 }
@@ -183,7 +187,8 @@ fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8
   let mut hmac = match algorithm {
     Algorithm::HS256 => create_hmac(Sha256::new(), secret),
     Algorithm::HS384 => create_hmac(Sha384::new(), secret),
-    Algorithm::HS512 => create_hmac(Sha512::new(), secret)
+    Algorithm::HS512 => create_hmac(Sha512::new(), secret),
+    Algorithm::RS256 => unimplemented!()
   };
 
   hmac.input(signing_input.to_string().as_bytes());
