@@ -1,12 +1,12 @@
 [package]
-name = "jwt"
+name = "frank_jwt"
 version = "2.0.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
 license = "Apache-2.0"
-homepage = "https://github.com/GildedHonour/rust-jwt"
-repository = "https://github.com/GildedHonour/rust-jwt"
+homepage = "https://github.com/GildedHonour/frank_jwt"
+repository = "https://github.com/GildedHonour/frank_jwt"
 description = "Implementation of JSON JWT"
-keywords = ["Crypto", "JWT", "JSON", "JSON Web token", "jwt.io"]
+keywords = ["Crypto", "jwt", "json", "token"]
 readme = "README.md"
 
 [dependencies]
