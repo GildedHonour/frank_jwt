@@ -1,10 +1,13 @@
 [package]
 name = "frank_jwt"
-version = "2.0.0"
+version = "2.1.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
 license = "Apache-2.0"
+
 homepage = "https://github.com/GildedHonour/frank_jwt"
 repository = "https://github.com/GildedHonour/frank_jwt"
+documentation = "https://github.com/GildedHonour/frank_jwt"
+
 description = "Implementation of JSON JWT"
 keywords = ["Crypto", "jwt", "json", "token"]
 readme = "README.md"
@@ -13,7 +16,3 @@ readme = "README.md"
 rust-crypto = "*"
 rustc-serialize = "0.3.15"
 time = "0.1.26"
-
-[lib]
-name = "jwt"
-

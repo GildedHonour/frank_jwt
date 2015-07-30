@@ -1,28 +1,27 @@
-Frank jwt [![Build Status](https://travis-ci.org/GildedHonour/frank_jwt.svg)](https://travis-ci.org/GildedHonour/frank_jwt)
+Frank JWT [![Build Status](https://travis-ci.org/GildedHonour/frank_jwt.svg)](https://travis-ci.org/GildedHonour/frank_jwt)
 ================================================
 
-Implementation of JSON JWT in Rust [JSON Web Tokens](http://jwt.io). It supports HS256, 384 and 512 signature algorithms.
+Implementation of [JSON Web Tokens](http://jwt.io) in Rust. It supports HS256, 384 and 512 signature algorithms.
 
 ## Usage
 
 Put this in your `Cargo.toml`:
 
 ```toml
-[dependencies.jwt]
-git = "https://github.com/GildedHonour/frank_jwt"
+[dependencies]
+frank_jwt = "*"
 ```
-Or find it at https://crates.io/crates/frank_jwt and install from there.
 
 And this in your crate root:
 
 ```rust
-extern crate jwt;
+extern crate frank_jwt;
 
-use jwt::Header;
-use jwt::Payload;
-use jwt::encode;
-use jwt::decode;
-use jwt::Algorithm;
+use frank_jwt::Header;
+use frank_jwt::Payload;
+use frank_jwt::encode;
+use frank_jwt::decode;
+use frank_jwt::Algorithm;
 ```
 
 ## Example
