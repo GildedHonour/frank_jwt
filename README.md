@@ -1,4 +1,5 @@
-Frank JWT [![Build Status](https://travis-ci.org/GildedHonour/frank_jwt.svg)](https://travis-ci.org/GildedHonour/frank_jwt)
+Frank JWT [![Build Status](https://travis-ci.org/GildedHonour/frank_jwt.svg)](https://travis-ci.org/GildedHonour/frank_jwt) [![crates.io](https://img.shields.io/crates/v/frank_jwt.svg)](https://crates.io/crates/frank_jwt)
+
 ================================================
 
 Implementation of [JSON Web Tokens](http://jwt.io) in Rust. It supports HS256, 384 and 512 signature algorithms.
