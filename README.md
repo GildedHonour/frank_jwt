@@ -48,3 +48,8 @@ Apache 2.0
 cargo test
 ```
 
+## I'm available for hire
+I'm a freelance developer and looking forwatd to new challenges.
+
+My email: me [/at] gildedhonour.com
+Website: www.gildedhonour.com, my CV can be found there.
