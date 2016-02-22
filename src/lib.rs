@@ -74,6 +74,7 @@ impl ToString for Algorithm {
   }
 }
 
+#[derive(Debug)]
 pub enum Error {
   SignatureExpired,
   SignatureInvalid,
