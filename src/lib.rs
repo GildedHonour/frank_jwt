@@ -56,16 +56,30 @@ pub enum Algorithm {
   HS256,
   HS384,
   HS512,
-  RS256
+  RS256,
+  RS384,
+  RS512,
+  ES256,
+  ES384,
+  ES512
 }
 
 impl ToString for Algorithm {
   fn to_string(&self) -> String {
     match *self {
+      Algorithm::None => "None".to_string(),
+
       Algorithm::HS256 => "HS256".to_string(),
       Algorithm::HS384 => "HS384".to_string(),
       Algorithm::HS512 => "HS512".to_string(),
-      Algorithm::RS256 => "RS256".to_string()
+      
+      Algorithm::RS256 => "RS256".to_string(),
+      Algorithm::RS384 => "RS256".to_string(),
+      Algorithm::RS512 => "RS256".to_string(),
+
+      Algorithm::ES256 => "RS256".to_string(),
+      Algorithm::ES384 => "RS256".to_string(),
+      Algorithm::ES512 => "RS256".to_string()
     } 
   }
 }
@@ -131,7 +145,6 @@ fn get_signing_input(payload: Payload, algorithm: &Algorithm) -> String {
   let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
   format!("{}.{}", encoded_header, encoded_payload)
 }
-
 
 fn sign_hmac(signing_input: &str, secret: String, algorithm: Algorithm) -> String {
   let mut hmac = match algorithm {
