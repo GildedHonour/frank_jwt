@@ -17,7 +17,7 @@ And this in your crate root:
 ```rust
 extern crate frank_jwt;
 
-use frank_jwt::{Header, Payload, encode, decode, Algorithm};
+use frank_jwt::{Header, Payload, Algorithm, encode, decode};
 ```
 
 ## Example
