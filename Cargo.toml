@@ -13,6 +13,6 @@ keywords = ["Crypto", "jwt", "json", "token"]
 readme = "README.md"
 
 [dependencies]
-rust-crypto = "*"
+rust-crypto = "0.2.35"
 rustc-serialize = "0.3.19"
 time = "0.1.26"
