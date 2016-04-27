@@ -17,11 +17,7 @@ And this in your crate root:
 ```rust
 extern crate frank_jwt;
 
-use frank_jwt::Header;
-use frank_jwt::Payload;
-use frank_jwt::encode;
-use frank_jwt::decode;
-use frank_jwt::Algorithm;
+use frank_jwt::{Header, Payload, encode, decode, Algorithm};
 ```
 
 ## Example
@@ -51,6 +47,4 @@ cargo test
 ## I'm available for hire
 I'm a freelance developer and looking forward to new challenges.
 
-My email: me [/at] gildedhonour.com
-
-Website: www.gildedhonour.com, my CV can be found there.
+me@gildedhonour.com | www.gildedhonour.com
