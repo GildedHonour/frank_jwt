@@ -23,7 +23,6 @@ extern crate rustc_serialize;
 extern crate time;
 extern crate crypto;
 
-use time::Duration;
 use rustc_serialize::base64;
 use rustc_serialize::base64::{ToBase64, FromBase64};
 use rustc_serialize::json;
@@ -34,9 +33,6 @@ use crypto::hmac::Hmac;
 use crypto::digest::Digest;
 use crypto::mac::Mac;
 use std::str;
-use std::fmt;
-use std::fmt::Formatter;
-use std::fmt::Debug;
 
 pub type Payload = BTreeMap<String, String>; //todo replace with &str
 
@@ -237,8 +233,6 @@ fn create_hmac<'a, D: Digest + 'a>(digest: D, some_str: String) -> Box<Mac + 'a>
 #[cfg(test)]
 mod tests {
   extern crate time;
-
-  use time::Duration;
 
   use super::Header;
   use super::Payload;
