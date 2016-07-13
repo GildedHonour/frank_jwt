@@ -40,7 +40,6 @@ use openssl::crypto::rsa::RSA;
 use openssl::crypto::hash::Hasher;
 use std::env;
 
-
 pub type Payload = BTreeMap<String, String>; //todo replace with &str
 
 pub struct Header {
@@ -380,6 +379,27 @@ mod tests {
     let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg";
     let jwt2 = encode(header, get_rsa_256_private_key_full_path(), p1.clone());
     assert_eq!(jwt1, jwt2);
+  }
+
+ #[test]
+  fn test_decode_valid_jwt_rs256_and_check_deeply() {
+    let mut p1 = Payload::new();
+    p1.insert("key1".to_string(), "val1".to_string());
+    p1.insert("key2".to_string(), "val2".to_string());
+    let h1 = Header::new(Algorithm::RS256);
+    let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg";
+    let res = decode(jwt1.to_string(), get_rsa_256_private_key_full_path(), Algorithm::RS256);
+    match res {
+      Ok((h2, p2)) => {
+        assert_eq!(h1.ttype, h2.ttype);
+        assert_eq!(h1.algorithm.to_string(), h2.algorithm.to_string()); //todo implement ==
+        for (k, v) in &p1 {
+          assert_eq!(true, p2.contains_key(k));
+          assert_eq!(v, p2.get(k).unwrap());
+        }
+      },
+      Err(e) => panic!("Error")
+    }
   }
 
   fn get_rsa_256_private_key_full_path() -> String {
