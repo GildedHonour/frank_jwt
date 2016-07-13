@@ -1,6 +1,6 @@
 [package]
 name = "frank_jwt"
-version = "2.1.1"
+version = "2.2.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
 license = "Apache-2.0"
 
@@ -9,10 +9,10 @@ repository = "https://github.com/GildedHonour/frank_jwt"
 documentation = "https://github.com/GildedHonour/frank_jwt"
 
 description = "Implementation of JSON JWT"
-keywords = ["Crypto", "jwt", "json", "token"]
+keywords = ["crypto", "jwt", "json", "token", "encryption", "signature", "security"]
 readme = "README.md"
 
 [dependencies]
-rust-crypto = "0.2.35"
 rustc-serialize = "0.3.19"
 time = "0.1.26"
+openssl = "0.7.14"
