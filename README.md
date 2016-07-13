@@ -38,7 +38,7 @@ use std::env;
 let mut payload = Payload::new();
 payload.insert("key1".to_string(), "val1".to_string());
 payload.insert("key2".to_string(), "val2".to_string());
-let header = Header::new(Algorithm::HS256);
+let header = Header::new(Algorithm::RS256);
 
 let mut path = env::current_dir().unwrap();
 path.push("some_folder");
