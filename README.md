@@ -1,11 +1,22 @@
 Frank JWT [![Build Status](https://travis-ci.org/GildedHonour/frank_jwt.svg)](https://travis-ci.org/GildedHonour/frank_jwt) [![crates.io](https://img.shields.io/crates/v/frank_jwt.svg)](https://crates.io/crates/frank_jwt)
 ================================================
 
-Implementation of [JSON Web Tokens](http://jwt.io) in Rust. It supports HS and RS256, 384 and 512 signature algorithms.
+Implementation of [JSON Web Tokens](http://jwt.io) in Rust.
+
+## Algorithms and features supported
+- [x] HS256
+- [x] HS384
+- [x] HS512
+- [x] RS256
+- [x] RS384
+- [x] RS512
+- [x] Sign
+- [x] Verify
+- [x] exp check
 
 ## Usage
 
-Put this in your `Cargo.toml`:
+Put this into your `Cargo.toml`:
 
 ```toml
 [dependencies]
