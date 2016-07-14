@@ -109,10 +109,10 @@ pub fn encode(header: Header, key: String, payload: Payload) -> String {
   format!("{}.{}", signing_input, signature)
 }
 
-pub fn decode(encoded_token: String, secret: String, algorithm: Algorithm) -> Result<(Header, Payload), Error> {
+pub fn decode(encoded_token: String, key: String, algorithm: Algorithm) -> Result<(Header, Payload), Error> {
   match decode_segments(encoded_token) {
     Some((header, payload, signature, signing_input)) => {
-      if !verify_signature(algorithm, signing_input, &signature, secret.to_string()) {
+      if !verify_signature(algorithm, signing_input, &signature, key.to_string()) {
         return Err(Error::SignatureInvalid)
       }
 
@@ -151,13 +151,14 @@ fn sign_hmac(signing_input: &str, key: String, algorithm: Algorithm) -> String {
 
 fn sign_rsa(signing_input: &str, private_key_path: String, algorithm: Algorithm) -> String {
   let mut hmac = match algorithm {
-    Algorithm::RS256 => {
+    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512=> {
       let mut buffer = File::open(private_key_path).unwrap();
       let private_key = RSA::private_key_from_pem(&mut buffer).unwrap();
-      let mut sha = Hasher::new(Type::SHA256);
+      let stp = get_sha_algorithm(algorithm);
+      let mut sha = Hasher::new(stp);
       sha.write_all(&signing_input.as_bytes()).unwrap();
       let digest = sha.finish();
-      private_key.sign(Type::SHA256, &digest).unwrap()
+      private_key.sign(stp, &digest).unwrap()
     },
     _  => panic!("Invalid rsa algorithm")
   };
@@ -168,13 +169,14 @@ fn sign_rsa(signing_input: &str, private_key_path: String, algorithm: Algorithm)
 //todo refactor
 fn sign_rsa2(signing_input: &str, private_key_path: String, algorithm: Algorithm) -> Vec<u8> {
   match algorithm {
-    Algorithm::RS256 => {
+    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512=> {
       let mut buffer = File::open(private_key_path).unwrap();
       let private_key = RSA::private_key_from_pem(&mut buffer).unwrap();
-      let mut sha = Hasher::new(Type::SHA256);
+      let stp = get_sha_algorithm(algorithm);
+      let mut sha = Hasher::new(stp);
       sha.write_all(&signing_input.as_bytes()).unwrap();
       let digest = sha.finish();
-      private_key.sign(Type::SHA256, &digest).unwrap()
+      private_key.sign(stp, &digest).unwrap()
     },
     _  => panic!("Invalid rsa algorithm")
   }
@@ -234,13 +236,34 @@ fn sign_hmac2(signing_input: &str, key: String, algorithm: Algorithm) -> Vec<u8>
   hmac(stp, key.as_bytes(), signing_input.as_bytes())
 }
 
+//todo refactor
 fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8], key: String) -> bool {
-  let signature2 = match algorithm {
-    Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => sign_hmac2(&signing_input, key, algorithm),
-    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => sign_rsa2(&signing_input, key, algorithm)
-  };
+  match algorithm {
+    Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
+      let signature2 = sign_hmac2(&signing_input, key, algorithm);
+      secure_compare(signature, &signature2)
+    }, Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => {
 
-  secure_compare(signature, &signature2)
+      let mut buffer = File::open(key).unwrap();
+      let public_key = RSA::public_key_from_pem(&mut buffer).unwrap();
+
+      let mut sha = Hasher::new(Type::SHA256);
+      sha.write_all(&signing_input.as_bytes()).unwrap();
+      let digest = sha.finish();
+
+      let stp = get_sha_algorithm(algorithm);
+      public_key.verify(stp, &digest, signature).unwrap()
+    }
+  }
+}
+
+fn get_sha_algorithm(alg: Algorithm) -> Type {
+  match alg {
+    Algorithm::RS256 => Type::SHA256,
+    Algorithm::RS384 => Type::SHA384,
+    Algorithm::RS512 => Type::SHA512,
+    _  => panic!("Invalid rsa algorithm")
+  }
 }
 
 fn secure_compare(a: &[u8], b: &[u8]) -> bool {
@@ -364,9 +387,8 @@ mod tests {
     path.push("my_rsa_2048_key.pem");
     let path2 = path.to_str().unwrap().to_string();
 
-    let kfn = get_rsa_256_private_key_full_path();
-    let jwt1 = encode(header, kfn.clone(), p1.clone());
-    let maybe_res = decode(jwt1, kfn, Algorithm::RS256);
+    let jwt1 = encode(header, get_rsa_256_private_key_full_path(), p1.clone());
+    let maybe_res = decode(jwt1, get_rsa_256_public_key_full_path(), Algorithm::RS256);
     assert!(maybe_res.is_ok());
   }
 
@@ -388,7 +410,7 @@ mod tests {
     p1.insert("key2".to_string(), "val2".to_string());
     let h1 = Header::new(Algorithm::RS256);
     let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg";
-    let res = decode(jwt1.to_string(), get_rsa_256_private_key_full_path(), Algorithm::RS256);
+    let res = decode(jwt1.to_string(), get_rsa_256_public_key_full_path(), Algorithm::RS256);
     match res {
       Ok((h2, p2)) => {
         assert_eq!(h1.ttype, h2.ttype);
@@ -406,6 +428,13 @@ mod tests {
     let mut path = env::current_dir().unwrap();
     path.push("test");
     path.push("my_rsa_2048_key.pem");
+    path.to_str().unwrap().to_string()
+  }
+
+  fn get_rsa_256_public_key_full_path() -> String {
+    let mut path = env::current_dir().unwrap();
+    path.push("test");
+    path.push("my_rsa_public_2048_key.pem");
     path.to_str().unwrap().to_string()
   }
 }

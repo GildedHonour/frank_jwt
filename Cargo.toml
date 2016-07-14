@@ -1,6 +1,6 @@
 [package]
 name = "frank_jwt"
-version = "2.2.0"
+version = "2.2.1"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
 license = "Apache-2.0"
 
