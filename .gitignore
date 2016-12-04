@@ -10,3 +10,5 @@
 tmp
 Cargo.lock
 1.txt
+.idea
+*.iml
