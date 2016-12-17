@@ -1,6 +1,6 @@
 [package]
 name = "frank_jwt"
-version = "2.2.1"
+version = "2.4.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@gmail.com>"]
 license = "Apache-2.0"
 
@@ -13,6 +13,6 @@ keywords = ["jwt", "json", "token", "encryption", "signature"]
 readme = "README.md"
 
 [dependencies]
-rustc-serialize = "0.3.19"
-time = "0.1.26"
-openssl = "0.7.14"
+rustc-serialize = "0.3.22"
+time = "0.1.35"
+openssl = "0.9.3"

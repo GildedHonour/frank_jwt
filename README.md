@@ -10,9 +10,18 @@ Implementation of [JSON Web Tokens](http://jwt.io) in Rust.
 - [x] RS256
 - [x] RS384
 - [x] RS512
+- [x] ES256
+- [x] ES384
+- [x] ES512
 - [x] Sign
 - [x] Verify
-- [x] exp check
+- [x] iss (issuer) check
+- [x] sub (subject) check
+- [x] aud (audience) check
+- [x] exp (expiration time) check
+- [x] nbf (not before time) check
+- [x] iat (issued at) check
+- [x] jti (JWT id) check
 
 ## Usage
 
@@ -20,7 +29,7 @@ Put this into your `Cargo.toml`:
 
 ```toml
 [dependencies]
-frank_jwt = "2.2.1"
+frank_jwt = "2.3.1"
 ```
 
 And this in your crate root:
@@ -72,4 +81,4 @@ cargo test
 ## I'm available for hire
 I'm a freelance developer and looking forward to new challenges.
 
-me@gildedhonour.com | www.gildedhonour.com
+me@gildedhonour.com | gildedhonour.com
