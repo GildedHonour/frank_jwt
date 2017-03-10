@@ -30,18 +30,16 @@ use rustc_serialize::json::{ToJson, Json};
 
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::Read;
 use std::str;
 
-//use openssl::crypto::rsa::RSA;
-//use openssl::crypto::hash::Hasher;
-
-use openssl::sign::Signer;
-use openssl::pkey::PKey;
 use openssl::hash::MessageDigest;
+use openssl::pkey::PKey;
 use openssl::rsa::Rsa;
+use openssl::sign::Signer;
+use openssl::sign::Verifier;
 
-pub type Payload = BTreeMap<&str, &str>; //todo replace with &str
+pub type Payload = BTreeMap<String, String>;
 
 pub struct Header {
   algorithm: Algorithm,
@@ -111,7 +109,7 @@ pub fn encode(header: Header, key: String, payload: Payload) -> String {
   let signature = match header.algorithm {
     Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => sign_hmac(&signing_input, key, header.algorithm),
     Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => sign_rsa(&signing_input, key, header.algorithm),
-    Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => sign_rsa(&signing_input, key, header.algorithm),
+    Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => sign_es(&signing_input, key, header.algorithm),
   };
 
   format!("{}.{}", signing_input, signature)
@@ -153,68 +151,34 @@ fn sign_hmac(data: &str, key: String, algorithm: Algorithm) -> String {
     _  => panic!("Invalid hmac algorithm")
   };
 
-  let key = PKey::hmac(key).unwrap();
+  let key = PKey::hmac(key.as_bytes()).unwrap();
   let mut signer = Signer::new(stp, &key).unwrap();
-  singer.update(data).unwrap();
+  signer.update(data.as_bytes()).unwrap();
   let hmac = signer.finish().unwrap();
   base64_url_encode(&hmac)
 }
 
 fn sign_rsa(data: &str, private_key_path: String, algorithm: Algorithm) -> String {
-  let hmac = match algorithm {
-    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512=> {
-
-
-//  let key = PKey::hmac(key).unwrap();
-  let mut signer = Signer::new(stp, &key).unwrap();
-  singer.update(data).unwrap();
-
-
-
-
-      let mut buffer = File::open(private_key_path).unwrap();
-      let private_key = Rsa::private_key_from_pem(&mut buffer).unwrap();
-      let pkey = PKey::from_rsa(private_key).unwrap();
-
-
-
-      let stp = get_sha_algorithm(algorithm);
-      let mut sha = Hasher::new(stp);
-      sha.write_all(&signing_input.as_bytes()).unwrap();
-      let digest = sha.finish();
-      private_key.sign(stp, &digest).unwrap()
-
-
-//////////
-
-//  let mut signer = Signer::new(MessageDigest::sha256(), &pkey).unwrap();
-//  signer.update(INPUT).unwrap();
-//  let result = signer.finish().unwrap();
-
-//  assert_eq!(result, SIGNATURE);
-//////////
-    },
-    _  => panic!("Invalid rsa algorithm")
+  let stp = match algorithm {
+    Algorithm::RS256 => MessageDigest::sha256(),
+    Algorithm::RS384 => MessageDigest::sha384(),
+    Algorithm::RS512 => MessageDigest::sha512(),
+    _  => panic!("Invalid hmac algorithm")
   };
 
-  base64_url_encode(&hmac)
+  let mut file = File::open(private_key_path).unwrap();
+  let mut buffer:Vec<u8> = Vec::new();
+  file.read_to_end(&mut buffer).unwrap();
+  let rsa = Rsa::private_key_from_pem(&buffer).unwrap();
+  let key = PKey::from_rsa(rsa).unwrap();
+  let mut signer = Signer::new(stp, &key).unwrap();
+  signer.update(data.as_bytes()).unwrap();
+  let signature = signer.finish().unwrap();
+  base64_url_encode(&signature)
 }
 
 fn sign_es(signing_input: &str, private_key_path: String, algorithm: Algorithm) -> String {
-  let hmac = match algorithm {
-    Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512=> {
-      let mut buffer = File::open(private_key_path).unwrap();
-      let private_key = RSA::private_key_from_pem(&mut buffer).unwrap();
-      let stp = get_sha_algorithm(algorithm);
-      let mut sha = Hasher::new(stp);
-      sha.write_all(&signing_input.as_bytes()).unwrap();
-      let digest = sha.finish();
-      private_key.sign(stp, &digest).unwrap()
-    },
-    _  => panic!("Invalid rsa algorithm")
-  };
-
-  base64_url_encode(&hmac)
+    sign_rsa(signing_input, private_key_path, algorithm)
 }
 
 fn decode_segments(encoded_token: String) -> Option<(Header, Payload, Vec<u8>, String)> {
@@ -259,7 +223,6 @@ fn parse_algorithm(alg: &str) -> Algorithm {
   }
 }
 
-//todo refactor
 fn sign_hmac2(data: &str, key: String, algorithm: Algorithm) -> Vec<u8> {
   let stp = match algorithm {
     Algorithm::HS256 => MessageDigest::sha256(),
@@ -268,45 +231,32 @@ fn sign_hmac2(data: &str, key: String, algorithm: Algorithm) -> Vec<u8> {
     _  => panic!("Invalid hmac algorithm")
   };
 
-//  hmac(stp, key.as_bytes(), signing_input.as_bytes())
-
-//
-  let key = PKey::hmac(key).unwrap();
-  let mut signer = Signer::new(stp, &key).unwrap();
-  singer.update(data).unwrap();
-  signer.finish().unwrap(); //hmac
+  let pkey = PKey::hmac(key.as_bytes()).unwrap();
+  let mut signer = Signer::new(stp, &pkey).unwrap();
+  signer.update(data.as_bytes()).unwrap();
+  signer.finish().unwrap()
 }
 
-//todo refactor
-fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8], key: String) -> bool {
+fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8], public_key: String) -> bool {
   match algorithm {
+
     Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
-      let signature2 = sign_hmac2(&signing_input, key, algorithm);
+      let signature2 = sign_hmac2(&signing_input, public_key, algorithm);
       secure_compare(signature, &signature2)
     },
 
-    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => {
-      let mut buffer = File::open(key).unwrap();
-      let public_key = Rsa::public_key_from_pem(&mut buffer).unwrap();
-
-      let mut sha = Hasher::new(Type::SHA256);
-      sha.write_all(&signing_input.as_bytes()).unwrap();
-      let digest = sha.finish();
-
-      let stp = get_sha_algorithm(algorithm);
-      public_key.verify(stp, &digest, signature).unwrap()
-    },
-
+    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 |
     Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => {
-      let mut buffer = File::open(key).unwrap();
-      let public_key = Rsa::public_key_from_pem(&mut buffer).unwrap();
+      let mut file = File::open(public_key).unwrap();
+      let mut buffer:Vec<u8> = Vec::new();
+      file.read_to_end(&mut buffer).unwrap();
+      let rsa = Rsa::public_key_from_pem(&buffer).unwrap();
+      let key = PKey::from_rsa(rsa).unwrap();
 
-      let mut sha = Hasher::new(Type::SHA256);
-      sha.write_all(&signing_input.as_bytes()).unwrap();
-      let digest = sha.finish();
-
-      let stp = get_sha_algorithm(algorithm);
-      public_key.verify(stp, &digest, signature).unwrap()
+      let digest = get_sha_algorithm(algorithm);
+      let mut verifier = Verifier::new(digest, &key).unwrap();
+      verifier.update(signing_input.as_bytes()).unwrap();
+      verifier.finish(&signature).unwrap()
     }
   }
 }
@@ -314,8 +264,8 @@ fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8
 fn get_sha_algorithm(alg: Algorithm) -> MessageDigest {
   match alg {
     Algorithm::RS256 => MessageDigest::sha256(),
-    Algorithm::RS384 => Type::SHA384,
-    Algorithm::RS512 => Type::SHA512,
+    Algorithm::RS384 => MessageDigest::sha384(),
+    Algorithm::RS512 => MessageDigest::sha512(),
     _  => panic!("Invalid rsa algorithm")
   }
 }
@@ -347,7 +297,6 @@ fn json_to_tree(input: Json) -> BTreeMap<String, String> {
   }
 }
 
-/*
 #[cfg(test)]
 mod tests {
   extern crate time;
@@ -440,7 +389,7 @@ mod tests {
     let mut path = env::current_dir().unwrap();
     path.push("test");
     path.push("my_rsa_2048_key.pem");
-    let path2 = path.to_str().unwrap().to_string();
+    path.to_str().unwrap().to_string();
 
     let jwt1 = encode(header, get_rsa_256_private_key_full_path(), p1.clone());
     let maybe_res = decode(jwt1, get_rsa_256_public_key_full_path(), Algorithm::RS256);
@@ -475,7 +424,7 @@ mod tests {
           assert_eq!(v, p2.get(k).unwrap());
         }
       },
-      Err(e) => panic!("Error")
+      Err(e) => panic!(e)
     }
   }
 
@@ -494,4 +443,3 @@ mod tests {
   }
 }
 
-*/
