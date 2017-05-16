@@ -10,3 +10,4 @@
 tmp
 Cargo.lock
 1.txt
+*.swp
