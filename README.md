@@ -29,7 +29,7 @@ Put this into your `Cargo.toml`:
 
 ```toml
 [dependencies]
-frank_jwt = "2.5.0"
+frank_jwt = "<current version of frank_jwt>"
 ```
 
 And this in your crate root:
