@@ -9,7 +9,7 @@ repository = "https://github.com/GildedHonour/frank_jwt"
 documentation = "https://github.com/GildedHonour/frank_jwt"
 
 description = "Implementation of JSON JWT"
-keywords = ["jwt", "json", "token", "encryption", "signature", "auth0-jwt"]
+keywords = ["jwt", "json", "token", "encryption", "auth0-jwt"]
 readme = "README.md"
 
 [dependencies]
