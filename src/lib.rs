@@ -38,6 +38,7 @@ use openssl::pkey::PKey;
 use openssl::rsa::Rsa;
 use openssl::sign::Signer;
 use openssl::sign::Verifier;
+use openssl::ec::EcKey;
 
 pub type Payload = BTreeMap<String, String>;
 
@@ -166,19 +167,38 @@ fn sign_rsa(data: &str, private_key_path: String, algorithm: Algorithm) -> Strin
     _  => panic!("Invalid hmac algorithm")
   };
 
-  let mut file = File::open(private_key_path).unwrap();
-  let mut buffer:Vec<u8> = Vec::new();
-  file.read_to_end(&mut buffer).unwrap();
+  let buffer = read_pem(&private_key_path[..]);
   let rsa = Rsa::private_key_from_pem(&buffer).unwrap();
   let key = PKey::from_rsa(rsa).unwrap();
-  let mut signer = Signer::new(stp, &key).unwrap();
-  signer.update(data.as_bytes()).unwrap();
-  let signature = signer.finish().unwrap();
-  base64_url_encode(&signature)
+  sign(data,key,stp)
 }
 
-fn sign_es(signing_input: &str, private_key_path: String, algorithm: Algorithm) -> String {
-    sign_rsa(signing_input, private_key_path, algorithm)
+fn sign_es(data: &str, private_key_path: String, algorithm: Algorithm) -> String {
+    let raw_key = read_pem(&private_key_path[..]);
+    let ec_key = EcKey::private_key_from_pem(&raw_key).expect("could not convert to EC private key");
+    let key = PKey::from_ec_key(ec_key).expect("could not convert EC private key");
+    let stp = match algorithm {
+      Algorithm::ES256 => MessageDigest::sha256(),
+      Algorithm::ES384 => MessageDigest::sha384(),
+      Algorithm::ES512 => MessageDigest::sha512(),
+      _  => panic!("Invalid hmac algorithm")
+    };
+
+    sign(data,key,stp)
+}
+
+fn sign(data: &str, private_key:PKey,digest: MessageDigest) -> String {
+    let mut signer = Signer::new(digest, &private_key).unwrap();
+    signer.update(data.as_bytes()).unwrap();
+    let signature = signer.finish().unwrap();
+    base64_url_encode(&signature)
+}
+
+fn read_pem(private_key_path: &str) -> Vec<u8>{
+    let mut file = File::open(private_key_path).unwrap();
+    let mut buffer:Vec<u8> = Vec::new();
+    file.read_to_end(&mut buffer).unwrap();
+    buffer
 }
 
 fn decode_segments(encoded_token: String) -> Option<(Header, Payload, Vec<u8>, String)> {
@@ -219,6 +239,9 @@ fn parse_algorithm(alg: &str) -> Algorithm {
     "HS384" => Algorithm::HS384,
     "HS512" => Algorithm::HS512,
     "RS256" => Algorithm::RS256,
+    "ES512" => Algorithm::ES512,
+    "ES384" => Algorithm::ES384,
+    "ES256" => Algorithm::ES256,
     _ => panic!("Unknown algorithm")
   }
 }
@@ -245,8 +268,7 @@ fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8
       secure_compare(signature, &signature2)
     },
 
-    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 |
-    Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => {
+    Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512  => {
       let mut file = File::open(public_key).unwrap();
       let mut buffer:Vec<u8> = Vec::new();
       file.read_to_end(&mut buffer).unwrap();
@@ -257,15 +279,24 @@ fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8
       let mut verifier = Verifier::new(digest, &key).unwrap();
       verifier.update(signing_input.as_bytes()).unwrap();
       verifier.finish(&signature).unwrap()
-    }
+    },
+    Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => {
+        let raw_pem = read_pem(&public_key[..]);
+        let key = PKey::public_key_from_pem(&raw_pem).expect("could not convert ec key to pkey");
+
+        let digest = get_sha_algorithm(algorithm);
+        let mut verifier = Verifier::new(digest, &key).unwrap();
+        verifier.update(signing_input.as_bytes()).unwrap();
+        verifier.finish(&signature).unwrap()
+    },
   }
 }
 
 fn get_sha_algorithm(alg: Algorithm) -> MessageDigest {
   match alg {
-    Algorithm::RS256 => MessageDigest::sha256(),
-    Algorithm::RS384 => MessageDigest::sha384(),
-    Algorithm::RS512 => MessageDigest::sha512(),
+    Algorithm::RS256 | Algorithm::ES256 => MessageDigest::sha256(),
+    Algorithm::RS384 | Algorithm::ES384 => MessageDigest::sha384(),
+    Algorithm::RS512 | Algorithm::ES512 => MessageDigest::sha512(),
     _  => panic!("Invalid rsa algorithm")
   }
 }
@@ -428,6 +459,34 @@ mod tests {
     }
   }
 
+
+  #[test]
+  fn test_encode_and_decode_jwt_ec() {
+    let mut p1 =  Payload::new();
+    p1.insert("key12".to_string(), "val1".to_string());
+    p1.insert("key22".to_string(), "val2".to_string());
+    p1.insert("key33".to_string(), "val3".to_string());
+    let header = Header::new(Algorithm::ES512);
+
+    let jwt1 = encode(header, get_ec_private_key_path(), p1.clone());
+    let maybe_res = decode(jwt1, get_ec_public_key_path(), Algorithm::ES512);
+    assert!(maybe_res.is_ok());
+  }
+
+  fn get_ec_private_key_path() -> String {
+      let mut path = env::current_dir().unwrap();
+      path.push("test");
+      path.push("ec_x9_62_prime256v1.private.key.pem");
+      path.to_str().unwrap().to_string()
+  }
+
+  fn get_ec_public_key_path() -> String {
+      let mut path = env::current_dir().unwrap();
+      path.push("test");
+      path.push("ec_x9_62_prime256v1.public.key.pem");
+      path.to_str().unwrap().to_string()
+  }
+
   fn get_rsa_256_private_key_full_path() -> String {
     let mut path = env::current_dir().unwrap();
     path.push("test");
@@ -442,4 +501,3 @@ mod tests {
     path.to_str().unwrap().to_string()
   }
 }
-
