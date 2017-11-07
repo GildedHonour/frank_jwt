@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015-2017 Alex Maslakov, <http://gildedhonour.com>, <http://alexmaslakov.com>
+ * Copyright (c) 2015-2018 Alex Maslakov, <gildedhonour.com>, <alexmaslakov.me>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,16 +72,16 @@ pub enum Algorithm {
 impl ToString for Algorithm {
   fn to_string(&self) -> String {
     match *self {
-      Algorithm::HS256 => "HS256".to_string(),
-      Algorithm::HS384 => "HS384".to_string(),
-      Algorithm::HS512 => "HS512".to_string(),
-      Algorithm::RS256 => "RS256".to_string(),
-      Algorithm::RS384 => "RS384".to_string(),
-      Algorithm::RS512 => "RS512".to_string(),
-      Algorithm::ES256 => "ES256".to_string(),
-      Algorithm::ES384 => "ES384".to_string(),
-      Algorithm::ES512 => "ES512".to_string()
-    }
+      Algorithm::HS256 => "HS256",
+      Algorithm::HS384 => "HS384",
+      Algorithm::HS512 => "HS512",
+      Algorithm::RS256 => "RS256",
+      Algorithm::RS384 => "RS384",
+      Algorithm::RS512 => "RS512",
+      Algorithm::ES256 => "ES256",
+      Algorithm::ES384 => "ES384",
+      Algorithm::ES512 => "ES512"
+    }.to_string()
   }
 }
 
@@ -178,7 +178,7 @@ fn sign_rsa(data: &str, private_key_path: String, algorithm: Algorithm) -> Strin
 }
 
 fn sign_es(signing_input: &str, private_key_path: String, algorithm: Algorithm) -> String {
-    sign_rsa(signing_input, private_key_path, algorithm)
+  sign_rsa(signing_input, private_key_path, algorithm)
 }
 
 fn decode_segments(encoded_token: String) -> Option<(Header, Payload, Vec<u8>, String)> {
@@ -239,7 +239,6 @@ fn sign_hmac2(data: &str, key: String, algorithm: Algorithm) -> Vec<u8> {
 
 fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8], public_key: String) -> bool {
   match algorithm {
-
     Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
       let signature2 = sign_hmac2(&signing_input, public_key, algorithm);
       secure_compare(signature, &signature2)
@@ -396,7 +395,7 @@ mod tests {
     assert!(maybe_res.is_ok());
   }
 
- #[test]
+  #[test]
   fn test_decode_valid_jwt_rs256() {
     let mut p1 = Payload::new();
     p1.insert("key1".to_string(), "val1".to_string());
@@ -407,7 +406,7 @@ mod tests {
     assert_eq!(jwt1, jwt2);
   }
 
- #[test]
+  #[test]
   fn test_decode_valid_jwt_rs256_and_check_deeply() {
     let mut p1 = Payload::new();
     p1.insert("key1".to_string(), "val1".to_string());
@@ -442,4 +441,3 @@ mod tests {
     path.to_str().unwrap().to_string()
   }
 }
-
