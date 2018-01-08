@@ -408,8 +408,9 @@ mod tests {
         let header = json!({});
 
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let maybe_res = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512);
-        assert!(maybe_res.is_ok());
+        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
+        assert_eq!(p1, payload);
+
     }
 
     fn get_ec_private_key_path() -> PathBuf {
