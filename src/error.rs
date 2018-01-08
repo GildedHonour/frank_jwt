@@ -19,6 +19,21 @@
  *
  */
 
+use std::io::Error as IoError;
+use serde_json::Error as SJError;
+use openssl::error::ErrorStack;
+use base64::DecodeError as B64Error;
+
+macro_rules! impl_error {
+    ($from:ty, $to:path) => {
+        impl From<$from> for Error {
+            fn from(e: $from) -> Self {
+                $to(format!("{:?}", e))
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum Error {
     SignatureExpired,
@@ -26,5 +41,14 @@ pub enum Error {
     JWTInvalid,
     IssuerInvalid,
     ExpirationInvalid,
-    AudienceInvalid
+    AudienceInvalid,
+    FormatInvalid(String),
+    IoError(String),
+    OpenSslError(String),
+    ProtocolError(String),
 }
+
+impl_error!{IoError, Error::IoError}
+impl_error!{SJError, Error::FormatInvalid}
+impl_error!{ErrorStack, Error::OpenSslError}
+impl_error!{B64Error, Error::ProtocolError}

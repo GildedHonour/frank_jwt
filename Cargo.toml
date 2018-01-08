@@ -1,18 +1,24 @@
 [package]
-name = "frank_jwt"
-version = "2.6.0"
 authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@protonmail.com>"]
-license = "Apache-2.0"
-
-homepage = "https://github.com/GildedHonour/frank_jwt"
-repository = "https://github.com/GildedHonour/frank_jwt"
-documentation = "https://github.com/GildedHonour/frank_jwt"
-
 description = "Implementation of JSON JWT"
-keywords = ["jwt", "json", "token", "encryption", "auth0-jwt"]
+documentation = "https://github.com/GildedHonour/frank_jwt"
+homepage = "https://github.com/GildedHonour/frank_jwt"
+keywords = [
+    "jwt",
+    "json",
+    "token",
+    "encryption",
+    "auth0-jwt",
+]
+license = "Apache-2.0"
+name = "frank_jwt"
 readme = "README.md"
+repository = "https://github.com/GildedHonour/frank_jwt"
+version = "2.6.0"
 
 [dependencies]
-rustc-serialize = "0.3.24"
-time = "0.1.37"
-openssl = "~0.9.12"
+base64 = "0.9.0"
+openssl = "^0.9"
+serde = "^1"
+serde_json = "^1"
+time = "^0.1"
