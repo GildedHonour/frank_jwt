@@ -1,5 +1,5 @@
 [package]
-authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@protonmail.com>"]
+authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@protonmail.com>", "Rick Richardson <rick.richardson@gmail.com>"]
 description = "Implementation of JSON JWT"
 documentation = "https://github.com/GildedHonour/frank_jwt"
 homepage = "https://github.com/GildedHonour/frank_jwt"

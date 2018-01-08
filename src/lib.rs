@@ -45,7 +45,7 @@ use openssl::ec::EcKey;
 use serde_json::Value as JsonValue;
 use base64::{encode_config as b64_enc, decode_config as b64_dec};
 
-use error::Error;
+pub use error::Error;
 
 const SEGMENTS_COUNT: usize = 3;
 
