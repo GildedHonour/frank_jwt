@@ -34,7 +34,7 @@ macro_rules! impl_error {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Error {
     SignatureExpired,
     SignatureInvalid,
