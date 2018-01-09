@@ -36,36 +36,42 @@ And this in your crate root:
 
 ```rust
 extern crate frank_jwt;
-
-use frank_jwt::{Header, Payload, Algorithm, encode, decode};
+#[macro_use]
+serde_json;
+use frank_jwt::{Algorithm, encode, decode};
 ```
 
 ## Example
 
 ```rust
 //HS256
-let mut payload = Payload::new();
-payload.insert("key1".to_string(), "val1".to_string());
-payload.insert("key2".to_string(), "val2".to_string());
-let header = Header::new(Algorithm::HS256);
+let mut payload = json!({
+    "key1" : "val1",
+    "key2" : "val2"
+});
+let mut header = json!({
+});
 let secret = "secret123";
 
-let jwt = encode(header, secret.to_string(), payload.clone());
+let jwt = encode(&header, secret.to_string(), &payload, Algorithm::HS256);
 
 //RS256
 use std::env;
 
-let mut payload = Payload::new();
-payload.insert("key1".to_string(), "val1".to_string());
-payload.insert("key2".to_string(), "val2".to_string());
-let header = Header::new(Algorithm::RS256);
+let mut payload = json!({
+    "key1" : "val1",
+    "key2" : "val2"
+});
+let mut header = json!({
+});
 
-let mut path = env::current_dir().unwrap();
-path.push("some_folder");
-path.push("my_rsa_2048_key.pem");
-let key_path = path.to_str().unwrap().to_string();
+let mut keypath = env::current_dir().unwrap();
+keypath.push("some_folder");
+keypath.push("my_rsa_2048_key.pem");
 
-let jwt = encode(header, key_path, payload.clone());
+let jwt = encode(&header, &keypath.to_path_buf(), &payload, Algorithm::RS256);
+
+let (header, payload) = decode(&jwt, &keypath.to_path_buf(), Algorithm::RS256);
 ```
 
 ## License

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015-2018 Alex Maslakov, <gildedhonour.com>, <alexmaslakov.me>
+ (c) 2015-2018 Alex Maslakov, <gildedhonour.com>, <alexmaslakov.me>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,16 +19,22 @@
  *
  */
 
-extern crate rustc_serialize;
 extern crate time;
 extern crate openssl;
+extern crate serde;
+extern crate base64;
+   
+#[cfg(test)]
+#[macro_use]
+extern crate serde_json;
+
+#[cfg(not(test))]
+extern crate serde_json;
 
 pub mod error;
 
-use rustc_serialize::base64::{self, ToBase64, FromBase64};
-use rustc_serialize::json::{self, ToJson, Json};
-use std::collections::BTreeMap;
 use std::fs::File;
+use std::path::{PathBuf};
 use std::io::Read;
 use std::str;
 use openssl::hash::MessageDigest;
@@ -36,23 +42,16 @@ use openssl::pkey::PKey;
 use openssl::rsa::Rsa;
 use openssl::sign::{Signer, Verifier};
 use openssl::ec::EcKey;
-use error::Error;
+use serde_json::Value as JsonValue;
+use base64::{encode_config as b64_enc, decode_config as b64_dec};
 
-pub type Payload = BTreeMap<String, String>;
+pub use error::Error;
+
+const SEGMENTS_COUNT: usize = 3;
+
 const STANDARD_HEADER_TYPE: &str = "JWT";
 
-pub struct Header {
-    algorithm: Algorithm,
-    ttype: String
-}
-
-impl Header {
-    pub fn new(alg: Algorithm) -> Header {
-        Header { algorithm: alg, ttype: STANDARD_HEADER_TYPE.to_string() }
-    }
-}
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Algorithm {
     HS256,
     HS384,
@@ -81,56 +80,57 @@ impl ToString for Algorithm {
     }
 }
 
-impl ToJson for Header {
-    fn to_json(&self) -> json::Json {
-        let mut map = BTreeMap::new();
-        map.insert("typ".to_string(), self.ttype.to_json());
-        map.insert("alg".to_string(), self.algorithm.to_string().to_json());
-        Json::Object(map)
+pub trait ToKey {
+    fn to_key(&self) -> Result<Vec<u8>, Error>;
+}
+
+impl ToKey for PathBuf {
+    fn to_key(&self) -> Result<Vec<u8>, Error> {
+        let mut file = File::open(self)?;
+        let mut buffer:Vec<u8> = Vec::new();
+        file.read_to_end(&mut buffer)?;
+        Ok(buffer)
     }
 }
 
-pub fn encode(header: Header, key: String, payload: Payload) -> String {
-    let signing_input = get_signing_input(payload, &header.algorithm);
-    let signature = match header.algorithm {
-        Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => sign_hmac(&signing_input, key, header.algorithm),
-        Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => sign_rsa(&signing_input, key, header.algorithm),
-        Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => sign_es(&signing_input, key, header.algorithm),
+impl ToKey for String {
+    fn to_key(&self) -> Result<Vec<u8>, Error> {
+        Ok(self.as_bytes().to_vec())
+    }
+}
+
+pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonValue, algorithm: Algorithm) -> Result<String, Error> {
+    header["alg"] = JsonValue::String(algorithm.to_string());
+    header["typ"] = JsonValue::String(STANDARD_HEADER_TYPE.to_owned());
+    let signing_input = get_signing_input(&payload, &header)?;
+    let signature = match algorithm {
+        Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => sign_hmac(&signing_input, signing_key, algorithm)?,
+        Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512 => sign_rsa(&signing_input, signing_key, algorithm)?,
+        Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => sign_es(&signing_input, signing_key, algorithm)?,
     };
 
-    format!("{}.{}", signing_input, signature)
+    Ok(format!("{}.{}", signing_input, signature))
 }
 
-pub fn decode(encoded_token: String, key: String, algorithm: Algorithm) -> Result<(Header, Payload), Error> {
-    match decode_segments(encoded_token) {
-        Some((header, payload, signature, signing_input)) => {
-            if !verify_signature(algorithm, signing_input, &signature, key.to_string()) {
-                return Err(Error::SignatureInvalid)
-            }
-
-            Ok((header, payload))
-        },
-
-        None => Err(Error::JWTInvalid)
+pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
+    let (header, payload, signature, signing_input) = decode_segments(encoded_token)?;
+    if !verify_signature(algorithm, signing_input, &signature, signing_key)? {
+        Err(Error::SignatureInvalid)
+    } else {
+        Ok((header, payload))
     }
 }
 
-//[#inline]
-fn segments_count() -> usize {
-    3
+fn get_signing_input(payload: &JsonValue, header: &JsonValue) -> Result<String, Error> {
+    
+    let header_json_str = serde_json::to_string(header)?;
+    let encoded_header = b64_enc(header_json_str.as_bytes(), base64::URL_SAFE);
+    let payload_json_str = serde_json::to_string(payload)?;
+    let encoded_payload = b64_enc(payload_json_str.as_bytes(), base64::URL_SAFE);
+    Ok(format!("{}.{}", encoded_header, encoded_payload))
 }
 
-fn get_signing_input(payload: Payload, algorithm: &Algorithm) -> String {
-    let header = Header::new(*algorithm);
-    let header_json_str = header.to_json();
-    let encoded_header = base64_url_encode(header_json_str.to_string().as_bytes()).to_string();
-    let p = payload.into_iter().map(|(k, v)| (k, v.to_json())).collect();
-    let payload_json = Json::Object(p);
-    let encoded_payload = base64_url_encode(payload_json.to_string().as_bytes()).to_string();
-    format!("{}.{}", encoded_header, encoded_payload)
-}
-
-fn sign_hmac(data: &str, key: String, algorithm: Algorithm) -> String {
+fn sign_hmac<P: ToKey>(data: &str, key_path: &P, algorithm: Algorithm) -> Result<String, Error> {
     let stp = match algorithm {
         Algorithm::HS256 => MessageDigest::sha256(),
         Algorithm::HS384 => MessageDigest::sha384(),
@@ -138,14 +138,14 @@ fn sign_hmac(data: &str, key: String, algorithm: Algorithm) -> String {
         _  => panic!("Invalid hmac algorithm")
     };
 
-    let key = PKey::hmac(key.as_bytes()).unwrap();
-    let mut signer = Signer::new(stp, &key).unwrap();
-    signer.update(data.as_bytes()).unwrap();
-    let hmac = signer.finish().unwrap();
-    base64_url_encode(&hmac)
+    let key = PKey::hmac(&key_path.to_key()?)?;
+    let mut signer = Signer::new(stp, &key)?;
+    signer.update(data.as_bytes())?;
+    let hmac = signer.sign_to_vec()?;
+    Ok(b64_enc(hmac.as_slice(), base64::URL_SAFE))
 }
 
-fn sign_rsa(data: &str, private_key_path: String, algorithm: Algorithm) -> String {
+fn sign_rsa<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> Result<String, Error> {
     let stp = match algorithm {
         Algorithm::RS256 => MessageDigest::sha256(),
         Algorithm::RS384 => MessageDigest::sha384(),
@@ -153,16 +153,14 @@ fn sign_rsa(data: &str, private_key_path: String, algorithm: Algorithm) -> Strin
         _  => panic!("Invalid hmac algorithm")
     };
 
-    let buffer = read_pem(&private_key_path[..]);
-    let rsa = Rsa::private_key_from_pem(&buffer).unwrap();
-    let key = PKey::from_rsa(rsa).unwrap();
+    let rsa = Rsa::private_key_from_pem(&private_key_path.to_key()?)?;
+    let key = PKey::from_rsa(rsa)?;
     sign(data, key, stp)
 }
 
-fn sign_es(data: &str, private_key_path: String, algorithm: Algorithm) -> String {
-    let raw_key = read_pem(&private_key_path[..]);
-    let ec_key = EcKey::private_key_from_pem(&raw_key).expect("could not convert to EC private key");
-    let key = PKey::from_ec_key(ec_key).expect("could not convert EC private key");
+fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> Result<String, Error> {
+    let ec_key = EcKey::private_key_from_pem(&private_key_path.to_key()?)?;
+    let key = PKey::from_ec_key(ec_key)?;
     let stp = match algorithm {
         Algorithm::ES256 => MessageDigest::sha256(),
         Algorithm::ES384 => MessageDigest::sha384(),
@@ -173,66 +171,39 @@ fn sign_es(data: &str, private_key_path: String, algorithm: Algorithm) -> String
     sign(data, key, stp)
 }
 
-fn sign(data: &str, private_key:PKey,digest: MessageDigest) -> String {
-    let mut signer = Signer::new(digest, &private_key).unwrap();
-    signer.update(data.as_bytes()).unwrap();
-    let signature = signer.finish().unwrap();
-    base64_url_encode(&signature)
+fn sign(data: &str, private_key:PKey,digest: MessageDigest) -> Result<String, Error> {
+    let mut signer = Signer::new(digest, &private_key)?;
+    signer.update(data.as_bytes())?;
+    let signature = signer.sign_to_vec()?;
+    Ok(b64_enc(signature.as_slice(), base64::URL_SAFE))
 }
 
-fn read_pem(private_key_path: &str) -> Vec<u8>{
-    let mut file = File::open(private_key_path).unwrap();
-    let mut buffer:Vec<u8> = Vec::new();
-    file.read_to_end(&mut buffer).unwrap();
-    buffer
-}
-
-fn decode_segments(encoded_token: String) -> Option<(Header, Payload, Vec<u8>, String)> {
+fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<u8>, String), Error> {
     let raw_segments: Vec<&str> = encoded_token.split(".").collect();
-    if raw_segments.len() != segments_count() {
-        return None
+    if raw_segments.len() != SEGMENTS_COUNT {
+        return Err(Error::JWTInvalid);
     }
 
     let header_segment = raw_segments[0];
     let payload_segment = raw_segments[1];
     let crypto_segment =  raw_segments[2];
-    let (header, payload) = decode_header_and_payload(header_segment, payload_segment);
-    let signature = &crypto_segment.as_bytes().from_base64().unwrap();
+    let (header, payload) = decode_header_and_payload(header_segment, payload_segment)?;
+    let signature = b64_dec(crypto_segment.as_bytes(), base64::URL_SAFE)?;
     let signing_input = format!("{}.{}", header_segment, payload_segment);
-    Some((header, payload, signature.clone(), signing_input))
+    Ok((header, payload, signature.clone(), signing_input))
 }
 
-fn decode_header_and_payload<'a>(header_segment: &str, payload_segment: &str) -> (Header, Payload) {
-    fn base64_to_json(input: &str) -> Json {
-        let bytes = input.as_bytes().from_base64().unwrap();
-        let s = str::from_utf8(&bytes).unwrap();
-        Json::from_str(s).unwrap()
+fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> Result<(JsonValue, JsonValue), Error> {
+    let b64_to_json = |seg| -> Result<JsonValue, Error> {
+        serde_json::from_slice(b64_dec(seg, base64::URL_SAFE)?.as_slice()).map_err(Error::from)
     };
 
-    let header_json = base64_to_json(header_segment);
-    let header_tree = json_to_tree(header_json);
-    let alg = header_tree.get("alg").unwrap();
-    let header = Header::new(parse_algorithm(alg));
-    let payload_json = base64_to_json(payload_segment);
-    let payload = json_to_tree(payload_json);
-    (header, payload)
+    let header_json = b64_to_json(header_segment)?;
+    let payload_json = b64_to_json(payload_segment)?;
+    Ok((header_json, payload_json))
 }
 
-//todo - move to Algorithm
-fn parse_algorithm(alg: &str) -> Algorithm {
-    match alg {
-        "HS256" => Algorithm::HS256,
-        "HS384" => Algorithm::HS384,
-        "HS512" => Algorithm::HS512,
-        "RS256" => Algorithm::RS256,
-        "ES512" => Algorithm::ES512,
-        "ES384" => Algorithm::ES384,
-        "ES256" => Algorithm::ES256,
-        _ => panic!("Unknown algorithm")
-    }
-}
-
-fn sign_hmac2(data: &str, key: String, algorithm: Algorithm) -> Vec<u8> {
+fn sign_hmac2(data: &str, key: &Vec<u8>, algorithm: Algorithm) -> Result<Vec<u8>, Error> {
     let stp = match algorithm {
         Algorithm::HS256 => MessageDigest::sha256(),
         Algorithm::HS384 => MessageDigest::sha384(),
@@ -240,39 +211,35 @@ fn sign_hmac2(data: &str, key: String, algorithm: Algorithm) -> Vec<u8> {
         _  => panic!("Invalid HMAC algorithm")
     };
 
-    let pkey = PKey::hmac(key.as_bytes()).unwrap();
-    let mut signer = Signer::new(stp, &pkey).unwrap();
-    signer.update(data.as_bytes()).unwrap();
-    signer.finish().unwrap()
+    let pkey = PKey::hmac(key)?;
+    let mut signer = Signer::new(stp, &pkey)?;
+    signer.update(data.as_bytes())?;
+    signer.sign_to_vec().map_err(Error::from)
 }
 
-fn verify_signature(algorithm: Algorithm, signing_input: String, signature: &[u8], public_key: String) -> bool {
+fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signature: &[u8], public_key: &P) -> Result<bool, Error> {
     match algorithm {
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
-            let signature2 = sign_hmac2(&signing_input, public_key, algorithm);
-            secure_compare(signature, &signature2)
+            let signature2 = sign_hmac2(&signing_input, &public_key.to_key()?, algorithm)?;
+            Ok(secure_compare(signature, &signature2))
         },
 
         Algorithm::RS256 | Algorithm::RS384 | Algorithm::RS512  => {
-            let mut file = File::open(public_key).unwrap();
-            let mut buffer:Vec<u8> = Vec::new();
-            file.read_to_end(&mut buffer).unwrap();
-            let rsa = Rsa::public_key_from_pem(&buffer).unwrap();
-            let key = PKey::from_rsa(rsa).unwrap();
+            let rsa = Rsa::public_key_from_pem(&public_key.to_key()?)?;
+            let key = PKey::from_rsa(rsa)?;
 
             let digest = get_sha_algorithm(algorithm);
-            let mut verifier = Verifier::new(digest, &key).unwrap();
-            verifier.update(signing_input.as_bytes()).unwrap();
-            verifier.finish(&signature).unwrap()
+            let mut verifier = Verifier::new(digest, &key)?;
+            verifier.update(signing_input.as_bytes())?;
+            verifier.verify(&signature).map_err(Error::from)
         },
         Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => {
-            let raw_pem = read_pem(&public_key[..]);
-            let key = PKey::public_key_from_pem(&raw_pem).expect("could not convert ec key to pkey");
+            let key = PKey::public_key_from_pem(&public_key.to_key()?).map_err(Error::from)?;
 
             let digest = get_sha_algorithm(algorithm);
-            let mut verifier = Verifier::new(digest, &key).unwrap();
-            verifier.update(signing_input.as_bytes()).unwrap();
-            verifier.finish(&signature).unwrap()
+            let mut verifier = Verifier::new(digest, &key)?;
+            verifier.update(signing_input.as_bytes())?;
+            verifier.verify(&signature).map_err(Error::from)
         },
     }
 }
@@ -299,52 +266,39 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     res == 0
 }
 
-fn base64_url_encode(bytes: &[u8]) -> String {
-    bytes.to_base64(base64::URL_SAFE)
-}
-
-fn json_to_tree(input: Json) -> BTreeMap<String, String> {
-    match input {
-        Json::Object(json_tree) => json_tree.into_iter().map(|(k, v)| (k, match v {
-            Json::String(s) => s,
-            _ => unreachable!()
-        })).collect(),
-        _ => unreachable!()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     extern crate time;
 
-    use super::{Header, Payload, Algorithm};
-    use super::encode;
-    use super::decode;
-    use super::secure_compare;
+    use super::{Algorithm, encode, decode, secure_compare, STANDARD_HEADER_TYPE };
     use std::env;
+    use std::path::PathBuf;
 
     #[test]
     fn test_encode_and_decode_jwt_hs256() {
-        let mut p1 =  Payload::new();
-        p1.insert("key1".to_string(), "val1".to_string());
-        p1.insert("key2".to_string(), "val2".to_string());
-        p1.insert("key3".to_string(), "val3".to_string());
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
 
-        let secret = "secret123";
-        let header = Header::new(Algorithm::HS256);
-        let jwt1 = encode(header, secret.to_string(), p1.clone());
-        let maybe_res = decode(jwt1, secret.to_string(), Algorithm::HS256);
+
+        let secret = "secret123".to_string();
+        let  header = json!({});
+        let jwt1 = encode(header, &secret, &p1, Algorithm::HS256).unwrap();
+        let maybe_res = decode(&jwt1, &secret, Algorithm::HS256);
         assert!(maybe_res.is_ok());
     }
 
     #[test]
     fn test_decode_valid_jwt_hs256() {
-        let mut p1 = Payload::new();
-        p1.insert("key11".to_string(), "val1".to_string());
-        p1.insert("key22".to_string(), "val2".to_string());
-        let secret = "secret123";
-        let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c";
-        let maybe_res = decode(jwt.to_string(), secret.to_string(), Algorithm::HS256);
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2"
+        });
+        let secret = "secret123".to_string();
+        let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
+        let maybe_res = decode(&jwt, &secret, Algorithm::HS256);
         assert!(maybe_res.is_ok());
     }
 
@@ -366,120 +320,124 @@ mod tests {
 
     #[test]
     fn test_encode_and_decode_jwt_hs384() {
-        let mut p1 =  Payload::new();
-        p1.insert("key1".to_string(), "val1".to_string());
-        p1.insert("key2".to_string(), "val2".to_string());
-        p1.insert("key3".to_string(), "val3".to_string());
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
 
-        let secret = "secret123";
-        let header = Header::new(Algorithm::HS384);
-        let jwt1 = encode(header, secret.to_string(), p1.clone());
-        let maybe_res = decode(jwt1, secret.to_string(), Algorithm::HS384);
+        let secret = "secret123".to_string();
+        let  header = json!({});
+        let jwt1 = encode(header, &secret, &p1, Algorithm::HS384).unwrap();
+        let maybe_res = decode(&jwt1, &secret, Algorithm::HS384);
         assert!(maybe_res.is_ok());
     }
 
     #[test]
     fn test_encode_and_decode_jwt_hs512() {
-        let mut p1 =  Payload::new();
-        p1.insert("key12".to_string(), "val1".to_string());
-        p1.insert("key22".to_string(), "val2".to_string());
-        p1.insert("key33".to_string(), "val3".to_string());
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
 
-        let secret = "secret123456";
-        let header = Header::new(Algorithm::HS512);
-        let jwt1 = encode(header, secret.to_string(), p1.clone());
-        let maybe_res = decode(jwt1, secret.to_string(), Algorithm::HS512);
+        let secret = "secret123456".to_string();
+        let  header = json!({});
+        let jwt1 = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
+        let maybe_res = decode(&jwt1, &secret, Algorithm::HS512);
         assert!(maybe_res.is_ok());
     }
 
     #[test]
     fn test_encode_and_decode_jwt_rs256() {
-        let mut p1 =  Payload::new();
-        p1.insert("key12".to_string(), "val1".to_string());
-        p1.insert("key22".to_string(), "val2".to_string());
-        p1.insert("key33".to_string(), "val3".to_string());
-        let header = Header::new(Algorithm::RS256);
-
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+        let  header = json!({}); 
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("my_rsa_2048_key.pem");
         path.to_str().unwrap().to_string();
 
-        let jwt1 = encode(header, get_rsa_256_private_key_full_path(), p1.clone());
-        let maybe_res = decode(jwt1, get_rsa_256_public_key_full_path(), Algorithm::RS256);
+        let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
+        let maybe_res = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
         assert!(maybe_res.is_ok());
     }
 
     #[test]
     fn test_decode_valid_jwt_rs256() {
-        let mut p1 = Payload::new();
-        p1.insert("key1".to_string(), "val1".to_string());
-        p1.insert("key2".to_string(), "val2".to_string());
-        let header = Header::new(Algorithm::RS256);
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg";
-        let jwt2 = encode(header, get_rsa_256_private_key_full_path(), p1.clone());
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2"
+        });
+        let  header = json!({});
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
+        let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
+        println!("\n{}",h1);
+        println!("{}",p1);
+        let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
+        let (h2, p2) = decode(&jwt2, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
+        println!("{}",h2);
+        println!("{}",p2);
         assert_eq!(jwt1, jwt2);
     }
 
     #[test]
     fn test_decode_valid_jwt_rs256_and_check_deeply() {
-        let mut p1 = Payload::new();
-        p1.insert("key1".to_string(), "val1".to_string());
-        p1.insert("key2".to_string(), "val2".to_string());
-        let h1 = Header::new(Algorithm::RS256);
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg";
-        let res = decode(jwt1.to_string(), get_rsa_256_public_key_full_path(), Algorithm::RS256);
-        match res {
-            Ok((h2, p2)) => {
-                assert_eq!(h1.ttype, h2.ttype);
-                assert_eq!(h1.algorithm.to_string(), h2.algorithm.to_string()); //todo implement ==
-                for (k, v) in &p1 {
-                    assert_eq!(true, p2.contains_key(k));
-                    assert_eq!(v, p2.get(k).unwrap());
-                }
-            },
-            Err(e) => panic!(e)
-        }
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2"
+        });
+        let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::RS256.to_string()});
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
+        let (h2, p2) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
+        assert_eq!(h1.get("typ").unwrap(), h2.get("typ").unwrap());
+        assert_eq!(h1.get("alg").unwrap(), h2.get("alg").unwrap());
+        assert_eq!(p1, p2);
     }
 
     #[test]
     fn test_encode_and_decode_jwt_ec() {
-        let mut p1 =  Payload::new();
-        p1.insert("key12".to_string(), "val1".to_string());
-        p1.insert("key22".to_string(), "val2".to_string());
-        p1.insert("key33".to_string(), "val3".to_string());
-        let header = Header::new(Algorithm::ES512);
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+        let header = json!({});
 
-        let jwt1 = encode(header, get_ec_private_key_path(), p1.clone());
-        let maybe_res = decode(jwt1, get_ec_public_key_path(), Algorithm::ES512);
-        assert!(maybe_res.is_ok());
+        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
+        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
+        assert_eq!(p1, payload);
+
     }
 
-    fn get_ec_private_key_path() -> String {
+    fn get_ec_private_key_path() -> PathBuf {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("ec_x9_62_prime256v1.private.key.pem");
-        path.to_str().unwrap().to_string()
+        path.to_path_buf()
     }
 
-    fn get_ec_public_key_path() -> String {
+    fn get_ec_public_key_path() -> PathBuf {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("ec_x9_62_prime256v1.public.key.pem");
-        path.to_str().unwrap().to_string()
+        path.to_path_buf()
     }
 
-    fn get_rsa_256_private_key_full_path() -> String {
+    fn get_rsa_256_private_key_full_path() -> PathBuf {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("my_rsa_2048_key.pem");
-        path.to_str().unwrap().to_string()
+        path.to_path_buf()
     }
 
-    fn get_rsa_256_public_key_full_path() -> String {
+    fn get_rsa_256_public_key_full_path() -> PathBuf {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("my_rsa_public_2048_key.pem");
-        path.to_str().unwrap().to_string()
+        path.to_path_buf()
     }
 }
