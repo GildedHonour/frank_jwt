@@ -3,18 +3,12 @@ authors = ["Alex Maslakov <me@gildedhonour.com>, <gilded.honour@protonmail.com>"
 description = "Implementation of JSON JWT"
 documentation = "https://github.com/GildedHonour/frank_jwt"
 homepage = "https://github.com/GildedHonour/frank_jwt"
-keywords = [
-    "jwt",
-    "json",
-    "token",
-    "encryption",
-    "auth0-jwt",
-]
+keywords = ["jwt", "json", "token", "encryption", "auth0-jwt"]
 license = "Apache-2.0"
 name = "frank_jwt"
 readme = "README.md"
 repository = "https://github.com/GildedHonour/frank_jwt"
-version = "2.6.0"
+version = "3.0.0"
 
 [dependencies]
 base64 = "0.9.0"
