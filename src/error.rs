@@ -20,11 +20,12 @@
  */
 
 error_chain! {
+
     foreign_links {
-        Io(::std::io::Error);
-        SerdeJson(::serde_json::Error);
-        OpenSsl(::openssl::error::ErrorStack);
-        Base64(::base64::DecodeError);
+        IoError(::std::io::Error);
+        FormatInvalid(::serde_json::Error);
+        OpenSslError(::openssl::error::ErrorStack);
+        ProtocolError(::base64::DecodeError);
     }
 
     errors {

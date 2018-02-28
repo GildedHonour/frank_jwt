@@ -47,8 +47,8 @@ use openssl::ec::EcKey;
 use serde_json::Value as JsonValue;
 use base64::{encode_config as b64_enc, decode_config as b64_dec};
 
-pub use error::Error;
-use error::{ Result, ErrorKind };
+pub use error::ErrorKind as Error;
+use error::{ Result };
 
 const SEGMENTS_COUNT: usize = 3;
 
@@ -118,7 +118,7 @@ pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonVa
 pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue)> {
     let (header, payload, signature, signing_input) = decode_segments(encoded_token)?;
     if !verify_signature(algorithm, signing_input, &signature, signing_key)? {
-        Err(ErrorKind::SignatureInvalid.into())
+        Err(Error::SignatureInvalid.into())
     } else {
         Ok((header, payload))
     }
@@ -184,7 +184,7 @@ fn sign(data: &str, private_key:PKey,digest: MessageDigest) -> Result<String> {
 fn decode_segments(encoded_token: &String) -> error::Result<(JsonValue, JsonValue, Vec<u8>, String)> {
     let raw_segments: Vec<&str> = encoded_token.split(".").collect();
     if raw_segments.len() != SEGMENTS_COUNT {
-        return Err(ErrorKind::JWTInvalid.into());
+        return Err(Error::JWTInvalid.into());
     }
 
     let header_segment = raw_segments[0];
@@ -198,7 +198,7 @@ fn decode_segments(encoded_token: &String) -> error::Result<(JsonValue, JsonValu
 
 fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> Result<(JsonValue, JsonValue)> {
     let b64_to_json = |seg| -> Result<JsonValue> {
-        serde_json::from_slice(b64_dec(seg, base64::URL_SAFE)?.as_slice()).map_err(Error::from)
+        serde_json::from_slice(b64_dec(seg, base64::URL_SAFE)?.as_slice()).map_err(error::Error::from)
     };
 
     let header_json = b64_to_json(header_segment)?;
@@ -217,7 +217,7 @@ fn sign_hmac2(data: &str, key: &Vec<u8>, algorithm: Algorithm) -> Result<Vec<u8>
     let pkey = PKey::hmac(key)?;
     let mut signer = Signer::new(stp, &pkey)?;
     signer.update(data.as_bytes())?;
-    signer.sign_to_vec().map_err(Error::from)
+    signer.sign_to_vec().map_err(error::Error::from)
 }
 
 fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signature: &[u8], public_key: &P) -> Result<bool> {
@@ -234,15 +234,15 @@ fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signa
             let digest = get_sha_algorithm(algorithm);
             let mut verifier = Verifier::new(digest, &key)?;
             verifier.update(signing_input.as_bytes())?;
-            verifier.verify(&signature).map_err(Error::from)
+            verifier.verify(&signature).map_err(error::Error::from)
         },
         Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => {
-            let key = PKey::public_key_from_pem(&public_key.to_key()?).map_err(Error::from)?;
+            let key = PKey::public_key_from_pem(&public_key.to_key()?).map_err(error::Error::from)?;
 
             let digest = get_sha_algorithm(algorithm);
             let mut verifier = Verifier::new(digest, &key)?;
             verifier.update(signing_input.as_bytes())?;
-            verifier.verify(&signature).map_err(Error::from)
+            verifier.verify(&signature).map_err(error::Error::from)
         },
     }
 }
