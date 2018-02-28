@@ -19,36 +19,22 @@
  *
  */
 
-use std::io::Error as IoError;
-use serde_json::Error as SJError;
-use openssl::error::ErrorStack;
-use base64::DecodeError as B64Error;
+error_chain! {
 
-macro_rules! impl_error {
-    ($from:ty, $to:path) => {
-        impl From<$from> for Error {
-            fn from(e: $from) -> Self {
-                $to(format!("{:?}", e))
-            }
-        }
+    foreign_links {
+        IoError(::std::io::Error);
+        FormatInvalid(::serde_json::Error);
+        OpenSslError(::openssl::error::ErrorStack);
+        ProtocolError(::base64::DecodeError);
+    }
+
+    errors {
+        SignatureExpired
+        SignatureInvalid
+        JWTInvalid
+        IssuerInvalid
+        ExpirationInvalid
+        AudienceInvalid
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Error {
-    SignatureExpired,
-    SignatureInvalid,
-    JWTInvalid,
-    IssuerInvalid,
-    ExpirationInvalid,
-    AudienceInvalid,
-    FormatInvalid(String),
-    IoError(String),
-    OpenSslError(String),
-    ProtocolError(String),
-}
-
-impl_error!{IoError, Error::IoError}
-impl_error!{SJError, Error::FormatInvalid}
-impl_error!{ErrorStack, Error::OpenSslError}
-impl_error!{B64Error, Error::ProtocolError}
