@@ -23,7 +23,7 @@ extern crate time;
 extern crate openssl;
 extern crate serde;
 extern crate base64;
-   
+
 #[cfg(test)]
 #[macro_use]
 extern crate serde_json;
@@ -122,7 +122,6 @@ pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algo
 }
 
 fn get_signing_input(payload: &JsonValue, header: &JsonValue) -> Result<String, Error> {
-    
     let header_json_str = serde_json::to_string(header)?;
     let encoded_header = b64_enc(header_json_str.as_bytes(), base64::URL_SAFE);
     let payload_json_str = serde_json::to_string(payload)?;
@@ -171,7 +170,7 @@ fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> 
     sign(data, key, stp)
 }
 
-fn sign(data: &str, private_key:PKey,digest: MessageDigest) -> Result<String, Error> {
+fn sign(data: &str, private_key: PKey,digest: MessageDigest) -> Result<String, Error> {
     let mut signer = Signer::new(digest, &private_key)?;
     signer.update(data.as_bytes())?;
     let signature = signer.sign_to_vec()?;
@@ -270,7 +269,7 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
 mod tests {
     extern crate time;
 
-    use super::{Algorithm, encode, decode, secure_compare, STANDARD_HEADER_TYPE };
+    use super::{Algorithm, encode, decode, secure_compare, STANDARD_HEADER_TYPE};
     use std::env;
     use std::path::PathBuf;
 
@@ -281,7 +280,6 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
-
 
         let secret = "secret123".to_string();
         let  header = json!({});
@@ -355,7 +353,7 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
-        let  header = json!({}); 
+        let  header = json!({});
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("my_rsa_2048_key.pem");
