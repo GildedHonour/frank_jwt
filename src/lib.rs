@@ -265,6 +265,41 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     res == 0
 }
 
+
+
+//todo
+fn verify_not_before() {
+    unimplemented!()
+}
+
+fn verify_sub() {
+    unimplemented!()
+}
+
+fn verify_jti() {
+    unimplemented!()
+}
+
+fn verify_iss() {
+    unimplemented!()
+}
+
+fn verify_iat() {
+    unimplemented!()
+}
+
+fn verify_expiration() {
+    unimplemented!()
+}
+
+fn verify_aud() {
+    unimplemented!()
+}
+
+
+
+
+
 #[cfg(test)]
 mod tests {
     extern crate time;
