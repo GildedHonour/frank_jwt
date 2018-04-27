@@ -101,7 +101,9 @@ impl ToKey for String {
 
 pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonValue, algorithm: Algorithm) -> Result<String, Error> {
     header["alg"] = JsonValue::String(algorithm.to_string());
-    header["typ"] = JsonValue::String(STANDARD_HEADER_TYPE.to_owned());
+    if header["typ"].is_null() {
+        header["typ"] = JsonValue::String(STANDARD_HEADER_TYPE.to_owned());
+    }
     let signing_input = get_signing_input(&payload, &header)?;
     let signature = match algorithm {
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => sign_hmac(&signing_input, signing_key, algorithm)?,
@@ -439,11 +441,28 @@ mod tests {
             "key3" : "val3"
         });
         let header = json!({});
+        let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::ES512.to_string()});
 
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
         let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
         assert_eq!(p1, payload);
+        assert_eq!(h1, header);
+    }
 
+    #[test]
+    fn test_header_typ_override() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+        let h1 = json!({"typ" : "cust", "alg" : Algorithm::ES512.to_string()});
+        let header = json!({"typ" : "cust"});
+ 
+        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
+        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
+        assert_eq!(h1, header);
+        assert_eq!(p1, payload);
     }
 
     fn get_ec_private_key_path() -> PathBuf {
