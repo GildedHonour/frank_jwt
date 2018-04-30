@@ -23,6 +23,8 @@ extern crate time;
 extern crate openssl;
 extern crate serde;
 extern crate base64;
+extern crate derp;
+extern crate untrusted;
 
 #[cfg(test)]
 #[macro_use]
@@ -44,6 +46,8 @@ use openssl::sign::{Signer, Verifier};
 use openssl::ec::EcKey;
 use serde_json::Value as JsonValue;
 use base64::{encode_config as b64_enc, decode_config as b64_dec};
+use derp::{Tag, Der};
+use untrusted::Input;
 
 pub use error::Error;
 
@@ -169,7 +173,13 @@ fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> 
         _  => panic!("Invalid hmac algorithm")
     };
 
-    sign(data, key, stp)
+    let mut signer = Signer::new(stp, &key)?;
+        signer.update(data.as_bytes())?;
+    let signature = signer.sign_to_vec()?;
+
+    // OpenSSL returns signature in DER format. Convert to raw format before encoding.
+    let signature_raw = der_to_raw_signature(&signature);
+    Ok(b64_enc(signature_raw.as_slice(), base64::URL_SAFE))
 }
 
 fn sign(data: &str, private_key: PKey,digest: MessageDigest) -> Result<String, Error> {
@@ -240,7 +250,10 @@ fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signa
             let digest = get_sha_algorithm(algorithm);
             let mut verifier = Verifier::new(digest, &key)?;
             verifier.update(signing_input.as_bytes())?;
-            verifier.verify(&signature).map_err(Error::from)
+
+            // Format signature as DER format for openssl.
+            let signature_der = raw_to_der_signature(&signature.to_vec());
+            verifier.verify(&signature_der).map_err(Error::from)
         },
     }
 }
@@ -267,6 +280,37 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     res == 0
 }
 
+fn der_to_raw_signature(der_sig: &[u8]) -> Vec<u8> {
+    let der_sig = Input::from(der_sig);
+    let (r, s) = der_sig.read_all(derp::Error::Read, |der_sig| {
+        derp::nested(der_sig, Tag::Sequence, |der_sig| {
+            let r = derp::positive_integer(der_sig)?;
+            let s = derp::positive_integer(der_sig)?;
+            Ok((r.as_slice_less_safe(), s.as_slice_less_safe()))
+        })
+    }).unwrap();
+    let mut raw_sig = Vec::new();
+    raw_sig.extend_from_slice(&r);
+    raw_sig.extend_from_slice(&s);
+
+    raw_sig
+}
+
+fn raw_to_der_signature(raw_sig: &[u8]) -> Vec<u8> {
+    let raw_sig_midpoint = raw_sig.len() / 2;
+    let r = raw_sig[..raw_sig_midpoint].to_vec();
+    let s = raw_sig[raw_sig_midpoint..].to_vec();
+    let mut der_sig = Vec::new();
+    {
+        let mut der = Der::new(&mut der_sig);
+        der.sequence(|der| {
+            der.positive_integer(&r)?;
+            der.positive_integer(&s)
+        }).unwrap();
+    }
+
+    der_sig
+}
 
 
 //todo
