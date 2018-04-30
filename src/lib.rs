@@ -251,7 +251,7 @@ fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signa
 
             // Format signature as DER format for openssl.
             let signature_der = raw_to_der_signature(&signature.to_vec());
-            verifier.verify(&signature_der).map_err(Error::from)verifier.verify(&signature).map_err(Error::from)
+            verifier.verify(&signature_der).map_err(Error::from)
         },
     }
 }
