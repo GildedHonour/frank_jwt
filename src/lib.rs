@@ -123,6 +123,12 @@ pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algo
     }
 }
 
+pub fn validate_signature<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<bool, Error> {
+    let (signature, signing_input) = decode_signature_segments(encoded_token)?;
+    verify_signature(algorithm, signing_input, &signature, signing_key)?;
+    Ok(true)
+}
+
 fn get_signing_input(payload: &JsonValue, header: &JsonValue) -> Result<String, Error> {
     let header_json_str = serde_json::to_string(header)?;
     let encoded_header = b64_enc(header_json_str.as_bytes(), base64::URL_SAFE);
@@ -192,6 +198,20 @@ fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<
     let signature = b64_dec(crypto_segment.as_bytes(), base64::URL_SAFE)?;
     let signing_input = format!("{}.{}", header_segment, payload_segment);
     Ok((header, payload, signature.clone(), signing_input))
+}
+
+fn decode_signature_segments(encoded_token: &String) -> Result<(Vec<u8>, String), Error> {
+    let raw_segments: Vec<&str> = encoded_token.split(".").collect();
+    if raw_segments.len() != SEGMENTS_COUNT {
+        return Err(Error::JWTInvalid);
+    }
+
+    let header_segment = raw_segments[0];
+    let payload_segment = raw_segments[1];
+    let crypto_segment =  raw_segments[2];
+    let signature = b64_dec(crypto_segment.as_bytes(), base64::URL_SAFE)?;
+    let signing_input = format!("{}.{}", header_segment, payload_segment);
+    Ok((signature.clone(), signing_input))
 }
 
 fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> Result<(JsonValue, JsonValue), Error> {
@@ -306,7 +326,7 @@ fn verify_aud() {
 mod tests {
     extern crate time;
 
-    use super::{Algorithm, encode, decode, secure_compare, STANDARD_HEADER_TYPE};
+    use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE};
     use std::env;
     use std::path::PathBuf;
 
@@ -334,6 +354,14 @@ mod tests {
         let secret = "secret123".to_string();
         let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
         let maybe_res = decode(&jwt, &secret, Algorithm::HS256);
+        assert!(maybe_res.is_ok());
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_hs256() {
+        let secret = "secret123".to_string();
+        let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
+        let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
         assert!(maybe_res.is_ok());
     }
 
@@ -369,6 +397,21 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_signature_jwt_hs384() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+
+        let secret = "secret123".to_string();
+        let  header = json!({});
+        let jwt1 = encode(header, &secret, &p1, Algorithm::HS384).unwrap();
+        let maybe_res = validate_signature(&jwt1, &secret, Algorithm::HS384);
+        assert!(maybe_res.is_ok());
+    }
+
+    #[test]
     fn test_encode_and_decode_jwt_hs512() {
         let p1 = json!({
             "key1" : "val1",
@@ -380,6 +423,21 @@ mod tests {
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
         let maybe_res = decode(&jwt1, &secret, Algorithm::HS512);
+        assert!(maybe_res.is_ok());
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_hs512() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+
+        let secret = "secret123456".to_string();
+        let  header = json!({});
+        let jwt1 = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
+        let maybe_res = validate_signature(&jwt1, &secret, Algorithm::HS512);
         assert!(maybe_res.is_ok());
     }
 
@@ -402,6 +460,24 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_signate_jwt_rs256() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+        let  header = json!({});
+        let mut path = env::current_dir().unwrap();
+        path.push("test");
+        path.push("my_rsa_2048_key.pem");
+        path.to_str().unwrap().to_string();
+
+        let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
+        let maybe_res = validate_signature(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
+        assert!(maybe_res.is_ok());
+    }
+
+    #[test]
     fn test_decode_valid_jwt_rs256() {
         let p1 = json!({
             "key1" : "val1",
@@ -417,6 +493,23 @@ mod tests {
         println!("{}",h2);
         println!("{}",p2);
         assert_eq!(jwt1, jwt2);
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_rs256() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2"
+        });
+        let  header = json!({});
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
+        let maybe_valid_sign1 = validate_signature(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
+        assert!(maybe_valid_sign1.is_ok());
+
+        let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
+        let maybe_valid_sign2 = validate_signature(&jwt2, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
+ 
+        assert!(maybe_valid_sign2.is_ok());
     }
 
     #[test]
@@ -447,6 +540,20 @@ mod tests {
         let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
         assert_eq!(p1, payload);
         assert_eq!(h1, header);
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_ec() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+        let header = json!({});
+
+        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
+        let maybe_valid_sign = validate_signature(&jwt1, &get_ec_public_key_path(), Algorithm::ES512);
+        assert!(maybe_valid_sign.is_ok());
     }
 
     #[test]
