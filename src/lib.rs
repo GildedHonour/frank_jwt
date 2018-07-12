@@ -19,7 +19,6 @@
  *
  */
 
-extern crate time;
 extern crate openssl;
 extern crate serde;
 extern crate base64;
@@ -324,8 +323,6 @@ fn verify_aud() {
 
 #[cfg(test)]
 mod tests {
-    extern crate time;
-
     use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE};
     use std::env;
     use std::path::PathBuf;
