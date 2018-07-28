@@ -119,7 +119,7 @@ pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonVa
     Ok(format!("{}.{}", signing_input, signature))
 }
 
-pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
+pub fn decode<T: AsRef<str>, P: ToKey>(encoded_token: T, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
     let (header, payload, signature, signing_input) = decode_segments(encoded_token)?;
     if !verify_signature(algorithm, signing_input, &signature, signing_key)? {
         Err(Error::SignatureInvalid)
@@ -128,7 +128,7 @@ pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algo
     }
 }
 
-pub fn validate_signature<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<bool, Error> {
+pub fn validate_signature<T: AsRef<str>, P: ToKey>(encoded_token: T, signing_key: &P, algorithm: Algorithm) -> Result<bool, Error> {
     let (signature, signing_input) = decode_signature_segments(encoded_token)?;
     verify_signature(algorithm, signing_input, &signature, signing_key)
 }
@@ -189,8 +189,8 @@ fn sign(data: &str, private_key: PKey,digest: MessageDigest) -> Result<String, E
     Ok(b64_enc(signature.as_slice(), base64::URL_SAFE))
 }
 
-fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<u8>, String), Error> {
-    let raw_segments: Vec<&str> = encoded_token.split(".").collect();
+fn decode_segments<T: AsRef<str>>(encoded_token: T) -> Result<(JsonValue, JsonValue, Vec<u8>, String), Error> {
+    let raw_segments: Vec<&str> = encoded_token.as_ref().split(".").collect();
     if raw_segments.len() != SEGMENTS_COUNT {
         return Err(Error::JWTInvalid);
     }
@@ -204,8 +204,8 @@ fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<
     Ok((header, payload, signature.clone(), signing_input))
 }
 
-fn decode_signature_segments(encoded_token: &String) -> Result<(Vec<u8>, String), Error> {
-    let raw_segments: Vec<&str> = encoded_token.split(".").collect();
+fn decode_signature_segments<T: AsRef<str>>(encoded_token: T) -> Result<(Vec<u8>, String), Error> {
+    let raw_segments: Vec<&str> = encoded_token.as_ref().split(".").collect();
     if raw_segments.len() != SEGMENTS_COUNT {
         return Err(Error::JWTInvalid);
     }
