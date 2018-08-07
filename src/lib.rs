@@ -123,7 +123,6 @@ pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonVa
 
 pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
     let (header, payload, mut signature, signing_input) = decode_segments(encoded_token)?;
-    // let signature2 = match signature.len() % 4 {
     let signature2 = match signature.len() % 4 {
         0 => signature,
         1 => {
@@ -288,6 +287,46 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
 
     res == 0
 }
+
+
+
+
+
+//todo
+fn b64_enc_ex(input: &[u8]) -> String{
+    if input.ends_with("=") {
+        input.pop();
+    };
+
+    if input.ends_with("=") {
+        input.pop();
+    };
+
+    input
+}
+
+fn b64_dec_ex(input: &[u8]) -> String{
+    match input.len() % 4 {
+        0 => signature,
+        1 => {
+            signature.extend_from_slice(&['=' as u8]);
+            signature
+        },
+        2 => {
+            signature.extend_from_slice(&['=' as u8]);
+            signature.extend_from_slice(&['=' as u8]);
+            signature
+        },
+        _ => panic!("unexpected value")
+    };
+}
+
+
+
+
+
+
+
 
 #[cfg(test)]
 mod tests {
