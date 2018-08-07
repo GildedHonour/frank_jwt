@@ -109,12 +109,36 @@ pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonVa
         Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => sign_es(&signing_input, signing_key, algorithm)?,
     };
 
-    Ok(format!("{}.{}", signing_input, signature))
+    let mut res = format!("{}.{}", signing_input, signature);
+    if res.ends_with("=") {
+        res.pop();
+    };
+
+    if res.ends_with("=") {
+        res.pop();
+    };
+
+    Ok(res)
 }
 
 pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
-    let (header, payload, signature, signing_input) = decode_segments(encoded_token)?;
-    if !verify_signature(algorithm, signing_input, &signature, signing_key)? {
+    let (header, payload, mut signature, signing_input) = decode_segments(encoded_token)?;
+    // let signature2 = match signature.len() % 4 {
+    let signature2 = match signature.len() % 4 {
+        0 => signature,
+        1 => {
+            signature.extend_from_slice(&['=' as u8]);
+            signature
+        },
+        2 => {
+            signature.extend_from_slice(&['=' as u8]);
+            signature.extend_from_slice(&['=' as u8]);
+            signature
+        },
+        _ => panic!("unexpected value")
+    };
+
+    if !verify_signature(algorithm, signing_input, &signature2, signing_key)? {
         Err(Error::SignatureInvalid)
     } else {
         Ok((header, payload))
@@ -265,41 +289,6 @@ fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     res == 0
 }
 
-
-
-//todo
-fn verify_not_before() {
-    unimplemented!()
-}
-
-fn verify_sub() {
-    unimplemented!()
-}
-
-fn verify_jti() {
-    unimplemented!()
-}
-
-fn verify_iss() {
-    unimplemented!()
-}
-
-fn verify_iat() {
-    unimplemented!()
-}
-
-fn verify_expiration() {
-    unimplemented!()
-}
-
-fn verify_aud() {
-    unimplemented!()
-}
-
-
-
-
-
 #[cfg(test)]
 mod tests {
     extern crate time;
@@ -329,6 +318,7 @@ mod tests {
             "key1" : "val1",
             "key2" : "val2"
         });
+
         let secret = "secret123".to_string();
         let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
         let maybe_res = decode(&jwt, &secret, Algorithm::HS256);
@@ -388,6 +378,7 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
+
         let  header = json!({});
         let mut path = env::current_dir().unwrap();
         path.push("test");
@@ -405,11 +396,13 @@ mod tests {
             "key1" : "val1",
             "key2" : "val2"
         });
+
         let  header = json!({});
         let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
         let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
         println!("\n{}",h1);
         println!("{}",p1);
+
         let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let (h2, p2) = decode(&jwt2, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
         println!("{}",h2);
@@ -423,6 +416,7 @@ mod tests {
             "key1" : "val1",
             "key2" : "val2"
         });
+
         let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::RS256.to_string()});
         let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
         let (h2, p2) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
@@ -438,8 +432,8 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
-        let header = json!({});
 
+        let header = json!({});
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
         let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
         assert_eq!(p1, payload);
