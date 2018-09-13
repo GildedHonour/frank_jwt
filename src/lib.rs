@@ -50,7 +50,7 @@ const SEGMENTS_COUNT: usize = 3;
 
 const STANDARD_HEADER_TYPE: &str = "JWT";
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Algorithm {
     HS256,
     HS384,
