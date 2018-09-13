@@ -335,7 +335,6 @@ fn verify_aud() {
 #[cfg(test)]
 mod tests {
     use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE};
-    use std::env;
     use std::path::PathBuf;
 
     #[test]
@@ -656,45 +655,31 @@ mod tests {
         assert_eq!(p1, payload);
     }
 
+    fn test_path(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test").join(name)
+    }
+
     fn get_ec_private_key_path() -> PathBuf {
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("ec_x9_62_prime256v1.private.key.pem");
-        path.to_path_buf()
+        test_path("ec_x9_62_prime256v1.private.key.pem")
     }
 
     fn get_ec_public_key_path() -> PathBuf {
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("ec_x9_62_prime256v1.public.key.pem");
-        path.to_path_buf()
+        test_path("ec_x9_62_prime256v1.public.key.pem")
     }
 
     fn get_bad_ec_public_key_path() -> PathBuf {
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("ec_2_x9_62_prime256v1.public.key.pem");
-        path.to_path_buf()
+        test_path("ec_2_x9_62_prime256v1.public.key.pem")
     }
 
     fn get_rsa_256_private_key_full_path() -> PathBuf {
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("my_rsa_2048_key.pem");
-        path.to_path_buf()
+        test_path("my_rsa_2048_key.pem")
     }
 
     fn get_rsa_256_public_key_full_path() -> PathBuf {
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("my_rsa_public_2048_key.pem");
-        path.to_path_buf()
+        test_path("my_rsa_public_2048_key.pem")
     }
 
     fn get_bad_rsa_256_public_key_full_path() -> PathBuf {
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("my_bad_rsa_public_2048_key.pem");
-        path.to_path_buf()
+        test_path("my_bad_rsa_public_2048_key.pem")
     }
 }
