@@ -63,8 +63,8 @@ pub enum Algorithm {
     ES512
 }
 
-impl ToString for Algorithm {
-    fn to_string(&self) -> String {
+impl Algorithm {
+    fn as_str(&self) -> &'static str {
         match *self {
             Algorithm::HS256 => "HS256",
             Algorithm::HS384 => "HS384",
@@ -75,7 +75,13 @@ impl ToString for Algorithm {
             Algorithm::ES256 => "ES256",
             Algorithm::ES384 => "ES384",
             Algorithm::ES512 => "ES512"
-        }.to_string()
+        }
+    }
+}
+
+impl ToString for Algorithm {
+    fn to_string(&self) -> String {
+        self.as_str().to_string()
     }
 }
 
