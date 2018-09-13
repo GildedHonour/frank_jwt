@@ -497,11 +497,6 @@ mod tests {
             "key3" : "val3"
         });
         let  header = json!({});
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("my_rsa_2048_key.pem");
-        path.to_str().unwrap().to_string();
-
         let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_res = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
         assert!(maybe_res.is_ok());
@@ -515,10 +510,6 @@ mod tests {
             "key3" : "val3"
         });
         let  header = json!({});
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("my_rsa_2048_key.pem");
-        path.to_str().unwrap().to_string();
 
         let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_res = validate_signature(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
@@ -533,10 +524,6 @@ mod tests {
             "key3" : "val3"
         });
         let  header = json!({});
-        let mut path = env::current_dir().unwrap();
-        path.push("test");
-        path.push("my_rsa_2048_key.pem");
-        path.to_str().unwrap().to_string();
 
         let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_res = validate_signature(&jwt1, &get_bad_rsa_256_public_key_full_path(), Algorithm::RS256);
