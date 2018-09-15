@@ -5,7 +5,7 @@
 *.rlib
 *.dll
 *.exe
-/target/
+/target
 .DS_Store
 tmp
 Cargo.lock
