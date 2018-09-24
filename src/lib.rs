@@ -153,7 +153,7 @@ fn sign_hmac<P: ToKey>(data: &str, key_path: &P, algorithm: Algorithm) -> Result
     let mut signer = Signer::new(stp, &key)?;
     signer.update(data.as_bytes())?;
     let hmac = signer.sign_to_vec()?;
-    Ok(b64_enc(hmac.as_slice(), base64::URL_SAFE))
+    Ok(b64_enc(hmac.as_slice(), base64::URL_SAFE_NO_PAD))
 }
 
 fn sign_rsa<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> Result<String, Error> {
@@ -186,7 +186,7 @@ fn sign(data: &str, private_key: PKey,digest: MessageDigest) -> Result<String, E
     let mut signer = Signer::new(digest, &private_key)?;
     signer.update(data.as_bytes())?;
     let signature = signer.sign_to_vec()?;
-    Ok(b64_enc(signature.as_slice(), base64::URL_SAFE))
+    Ok(b64_enc(signature.as_slice(), base64::URL_SAFE_NO_PAD))
 }
 
 fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<u8>, String), Error> {
@@ -213,7 +213,7 @@ fn decode_signature_segments(encoded_token: &String) -> Result<(Vec<u8>, String)
     let header_segment = raw_segments[0];
     let payload_segment = raw_segments[1];
     let crypto_segment =  raw_segments[2];
-    let signature = b64_dec(crypto_segment.as_bytes(), base64::URL_SAFE)?;
+    let signature = b64_dec(crypto_segment.as_bytes(), base64::URL_SAFE_NO_PAD)?;
     let signing_input = format!("{}.{}", header_segment, payload_segment);
     Ok((signature.clone(), signing_input))
 }
@@ -544,7 +544,7 @@ mod tests {
             "key2" : "val2"
         });
         let  header = json!({});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng".to_string();
         let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
         println!("\n{}",h1);
         println!("{}",p1);
@@ -562,7 +562,7 @@ mod tests {
             "key2" : "val2"
         });
         let  header = json!({});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng".to_string();
         let maybe_valid_sign1 = validate_signature(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
         assert!(maybe_valid_sign1.is_ok());
 
