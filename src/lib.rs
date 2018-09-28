@@ -135,9 +135,9 @@ pub fn validate_signature<P: ToKey>(encoded_token: &String, signing_key: &P, alg
 
 fn get_signing_input(payload: &JsonValue, header: &JsonValue) -> Result<String, Error> {
     let header_json_str = serde_json::to_string(header)?;
-    let encoded_header = b64_enc(header_json_str.as_bytes(), base64::URL_SAFE);
+    let encoded_header = b64_enc(header_json_str.as_bytes(), base64::URL_SAFE_NO_PAD);
     let payload_json_str = serde_json::to_string(payload)?;
-    let encoded_payload = b64_enc(payload_json_str.as_bytes(), base64::URL_SAFE);
+    let encoded_payload = b64_enc(payload_json_str.as_bytes(), base64::URL_SAFE_NO_PAD);
     Ok(format!("{}.{}", encoded_header, encoded_payload))
 }
 
@@ -199,7 +199,7 @@ fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<
     let payload_segment = raw_segments[1];
     let crypto_segment =  raw_segments[2];
     let (header, payload) = decode_header_and_payload(header_segment, payload_segment)?;
-    let signature = b64_dec(crypto_segment.as_bytes(), base64::URL_SAFE)?;
+    let signature = b64_dec(crypto_segment.as_bytes(), base64::URL_SAFE_NO_PAD)?;
     let signing_input = format!("{}.{}", header_segment, payload_segment);
     Ok((header, payload, signature.clone(), signing_input))
 }
@@ -220,7 +220,7 @@ fn decode_signature_segments(encoded_token: &String) -> Result<(Vec<u8>, String)
 
 fn decode_header_and_payload(header_segment: &str, payload_segment: &str) -> Result<(JsonValue, JsonValue), Error> {
     let b64_to_json = |seg| -> Result<JsonValue, Error> {
-        serde_json::from_slice(b64_dec(seg, base64::URL_SAFE)?.as_slice()).map_err(Error::from)
+        serde_json::from_slice(b64_dec(seg, base64::URL_SAFE_NO_PAD)?.as_slice()).map_err(Error::from)
     };
 
     let header_json = b64_to_json(header_segment)?;
@@ -365,6 +365,14 @@ mod tests {
         let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
         let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
         assert!(maybe_res.unwrap());
+    }
+
+    #[test]
+    fn test_validate_signature_with_header_jwt_hs256() {
+       let secret = "secret".to_string();
+       let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyaWQiOiJDUklTUCIsImdyb3VwIjoiQVRJIiwicmVzb3VyY2VzIjpbXX0.K9nfZnbMzF1-P1zXEQHeYYUz35NTbTPpT560wNG16DM".to_string();
+       let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
+       assert!(maybe_res.unwrap());
     }
 
     #[test]
@@ -544,7 +552,7 @@ mod tests {
             "key2" : "val2"
         });
         let  header = json!({});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng".to_string();
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg".to_string();
         let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
         println!("\n{}",h1);
         println!("{}",p1);
