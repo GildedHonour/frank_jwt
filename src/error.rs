@@ -1,3 +1,6 @@
+use base64::DecodeError as B64Error;
+use openssl::error::ErrorStack;
+use serde_json::Error as SJError;
 /**
  * Copyright (c) 2015-2018 Alex Maslakov, <gildedhonour.com>, <alexmaslakov.me>
  *
@@ -18,11 +21,7 @@
  * https://github.com/GildedHonour/frank_jwt
  *
  */
-
 use std::io::Error as IoError;
-use serde_json::Error as SJError;
-use openssl::error::ErrorStack;
-use base64::DecodeError as B64Error;
 
 macro_rules! impl_error {
     ($from:ty, $to:path) => {
@@ -31,7 +30,7 @@ macro_rules! impl_error {
                 $to(format!("{:?}", e))
             }
         }
-    }
+    };
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
