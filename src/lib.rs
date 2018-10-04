@@ -37,7 +37,7 @@ use std::path::{PathBuf};
 use std::io::Read;
 use std::str;
 use openssl::hash::MessageDigest;
-use openssl::pkey::PKey;
+use openssl::pkey::{PKey, Private};
 use openssl::rsa::Rsa;
 use openssl::sign::{Signer, Verifier};
 use openssl::ec::EcKey;
@@ -182,7 +182,7 @@ fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> 
     sign(data, key, stp)
 }
 
-fn sign(data: &str, private_key: PKey,digest: MessageDigest) -> Result<String, Error> {
+fn sign(data: &str, private_key: PKey<Private>, digest: MessageDigest) -> Result<String, Error> {
     let mut signer = Signer::new(digest, &private_key)?;
     signer.update(data.as_bytes())?;
     let signature = signer.sign_to_vec()?;
