@@ -649,7 +649,7 @@ mod tests {
             "key2" : "val2"
         });
         let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::RS256.to_string()});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng";
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkyIjoidmFsMiIsImtleTEiOiJ2YWwxIn0.sxu5S_bBQw8iFWbsQrTEWWl8Upxg1E9KpZaiS38uHEqyzaEgiDiBqQl3BnAuDw1zFNmtkAmlE4qGlBBYYQiqtNzUogYjdWf-fx1VlhGX0HFtnnwqy71jQV5oh60t4d4MdXAK_CNuu_gQXCoeipSJMS3yAWHaa7WqmIaeeg7bDfCCWuHAdsZtBqS-riJCIlLRxwA0SY3fCYSpzB5CeFzKXKmcWUwXrxBzZqER2LfQ5bXuw7f1gofrSjYW7kVK1KRIrSSo1RIkD_s4rba4N_TTQtRzY4pZCnkHMOKscHQ0vRzoRIP-mQ8AljhP_SI_wcHSh31zKhP2Zt3_Xr9Dvyx97A";
         let (h2, p2) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
         assert_eq!(h1.get("typ").unwrap(), h2.get("typ").unwrap());
         assert_eq!(h1.get("alg").unwrap(), h2.get("alg").unwrap());
