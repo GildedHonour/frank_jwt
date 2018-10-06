@@ -15,13 +15,13 @@ Implementation of [JSON Web Tokens](http://jwt.io) in Rust.
 - [x] ES512
 - [x] Sign
 - [x] Verify
-- [x] iss (issuer) check
-- [x] sub (subject) check
-- [x] aud (audience) check
-- [x] exp (expiration time) check
-- [x] nbf (not before time) check
-- [x] iat (issued at) check
-- [x] jti (JWT id) check
+- [ ] iss (issuer) check
+- [ ] sub (subject) check
+- [ ] aud (audience) check
+- [ ] exp (expiration time) check
+- [ ] nbf (not before time) check
+- [ ] iat (issued at) check
+- [ ] jti (JWT id) check
 
 ## Usage
 
