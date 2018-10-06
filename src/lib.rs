@@ -98,6 +98,12 @@ impl ToKey for String {
     }
 }
 
+impl<'a> ToKey for &'a str {
+    fn to_key(&self) -> Result<Vec<u8>, Error> {
+        Ok(self.as_bytes().to_vec())
+    }
+}
+
 impl ToKey for Vec<u8> {
     fn to_key(&self) -> Result<Vec<u8>, Error> {
         Ok(self.clone())
@@ -119,7 +125,7 @@ pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonVa
     Ok(format!("{}.{}", signing_input, signature))
 }
 
-pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
+pub fn decode<P: ToKey>(encoded_token: &str, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
     let (header, payload, signature, signing_input) = decode_segments(encoded_token)?;
     if !verify_signature(algorithm, signing_input, &signature, signing_key)? {
         Err(Error::SignatureInvalid)
@@ -128,7 +134,7 @@ pub fn decode<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algo
     }
 }
 
-pub fn validate_signature<P: ToKey>(encoded_token: &String, signing_key: &P, algorithm: Algorithm) -> Result<bool, Error> {
+pub fn validate_signature<P: ToKey>(encoded_token: &str, signing_key: &P, algorithm: Algorithm) -> Result<bool, Error> {
     let (signature, signing_input) = decode_signature_segments(encoded_token)?;
     verify_signature(algorithm, signing_input, &signature, signing_key)
 }
@@ -189,7 +195,7 @@ fn sign(data: &str, private_key: PKey<Private>, digest: MessageDigest) -> Result
     Ok(b64_enc(signature.as_slice(), base64::URL_SAFE_NO_PAD))
 }
 
-fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<u8>, String), Error> {
+fn decode_segments(encoded_token: &str) -> Result<(JsonValue, JsonValue, Vec<u8>, String), Error> {
     let raw_segments: Vec<&str> = encoded_token.split(".").collect();
     if raw_segments.len() != SEGMENTS_COUNT {
         return Err(Error::JWTInvalid);
@@ -204,7 +210,7 @@ fn decode_segments(encoded_token: &String) -> Result<(JsonValue, JsonValue, Vec<
     Ok((header, payload, signature.clone(), signing_input))
 }
 
-fn decode_signature_segments(encoded_token: &String) -> Result<(Vec<u8>, String), Error> {
+fn decode_signature_segments(encoded_token: &str) -> Result<(Vec<u8>, String), Error> {
     let raw_segments: Vec<&str> = encoded_token.split(".").collect();
     if raw_segments.len() != SEGMENTS_COUNT {
         return Err(Error::JWTInvalid);
@@ -333,7 +339,7 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_encode_and_decode_jwt_hs256() {
+    fn test_encode_and_decode_jwt_hs256_string() {
         let p1 = json!({
             "key1" : "val1",
             "key2" : "val2",
@@ -348,11 +354,22 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_valid_jwt_hs256() {
+    fn test_encode_and_decode_jwt_hs256_str() {
         let p1 = json!({
             "key1" : "val1",
-            "key2" : "val2"
+            "key2" : "val2",
+            "key3" : "val3"
         });
+
+        let secret = "secret123";
+        let  header = json!({});
+        let jwt1 = encode(header, &secret, &p1, Algorithm::HS256).unwrap();
+        let maybe_res = decode(&jwt1, &secret, Algorithm::HS256);
+        assert!(maybe_res.is_ok());
+    }
+
+    #[test]
+    fn test_decode_valid_jwt_hs256_string() {
         let secret = "secret123".to_string();
         let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
         let maybe_res = decode(&jwt, &secret, Algorithm::HS256);
@@ -360,7 +377,15 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_signature_jwt_hs256() {
+    fn test_decode_valid_jwt_hs256_str() {
+        let secret = "secret123";
+        let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c";
+        let maybe_res = decode(&jwt, &secret, Algorithm::HS256);
+        assert!(maybe_res.is_ok());
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_hs256_string() {
         let secret = "secret123".to_string();
         let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
         let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
@@ -368,7 +393,15 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_signature_with_header_jwt_hs256() {
+    fn test_validate_signature_jwt_hs256_str() {
+        let secret = "secret123";
+        let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c";
+        let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
+        assert!(maybe_res.unwrap());
+    }
+
+    #[test]
+    fn test_validate_signature_with_header_jwt_hs256_string() {
        let secret = "secret".to_string();
        let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyaWQiOiJDUklTUCIsImdyb3VwIjoiQVRJIiwicmVzb3VyY2VzIjpbXX0.K9nfZnbMzF1-P1zXEQHeYYUz35NTbTPpT560wNG16DM".to_string();
        let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
@@ -376,9 +409,25 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_signature_jwt_hs256_invalid() {
+    fn test_validate_signature_with_header_jwt_hs256_str() {
+       let secret = "secret";
+       let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyaWQiOiJDUklTUCIsImdyb3VwIjoiQVRJIiwicmVzb3VyY2VzIjpbXX0.K9nfZnbMzF1-P1zXEQHeYYUz35NTbTPpT560wNG16DM";
+       let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
+       assert!(maybe_res.unwrap());
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_hs256_invalid_string() {
         let secret = "secret123".to_string();
         let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ8.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
+        let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
+        assert!(!maybe_res.unwrap());
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_hs256_invalid_str() {
+        let secret = "secret123";
+        let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ8.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c";
         let maybe_res = validate_signature(&jwt, &secret, Algorithm::HS256);
         assert!(!maybe_res.unwrap());
     }
@@ -407,7 +456,7 @@ mod tests {
             "key3" : "val3"
         });
 
-        let secret = "secret123".to_string();
+        let secret = "secret123";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS384).unwrap();
         let maybe_res = decode(&jwt1, &secret, Algorithm::HS384);
@@ -422,7 +471,7 @@ mod tests {
             "key3" : "val3"
         });
 
-        let secret = "secret123".to_string();
+        let secret = "secret123";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS384).unwrap();
         let maybe_res = validate_signature(&jwt1, &secret, Algorithm::HS384);
@@ -437,10 +486,10 @@ mod tests {
             "key3" : "val3"
         });
 
-        let secret = "secret123".to_string();
+        let secret = "secret123";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS384).unwrap();
-        let bad_secret = "secret1234".to_string();
+        let bad_secret = "secret1234";
         let maybe_res = validate_signature(&jwt1, &bad_secret, Algorithm::HS384);
         assert!(!maybe_res.unwrap());
     }
@@ -453,7 +502,7 @@ mod tests {
             "key3" : "val3"
         });
 
-        let secret = "secret123456".to_string();
+        let secret = "secret123456";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
         let maybe_res = decode(&jwt1, &secret, Algorithm::HS512);
@@ -468,7 +517,7 @@ mod tests {
             "key3" : "val3"
         });
 
-        let secret = "secret123456".to_string();
+        let secret = "secret123456";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
         let maybe_res = validate_signature(&jwt1, &secret, Algorithm::HS512);
@@ -483,10 +532,10 @@ mod tests {
             "key3" : "val3"
         });
 
-        let secret = "secret123456".to_string();
+        let secret = "secret123456";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
-        let bad_secret = "secret123456789".to_string();
+        let bad_secret = "secret123456789";
         let maybe_res = validate_signature(&jwt1, &bad_secret, Algorithm::HS512);
         assert!(!maybe_res.unwrap());
     }
@@ -502,7 +551,7 @@ mod tests {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("my_rsa_2048_key.pem");
-        path.to_str().unwrap().to_string();
+        path.to_str().unwrap();
 
         let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_res = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
@@ -520,7 +569,7 @@ mod tests {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("my_rsa_2048_key.pem");
-        path.to_str().unwrap().to_string();
+        path.to_str().unwrap();
 
         let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_res = validate_signature(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
@@ -538,7 +587,7 @@ mod tests {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("my_rsa_2048_key.pem");
-        path.to_str().unwrap().to_string();
+        path.to_str().unwrap();
 
         let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_res = validate_signature(&jwt1, &get_bad_rsa_256_public_key_full_path(), Algorithm::RS256);
@@ -547,12 +596,8 @@ mod tests {
 
     #[test]
     fn test_decode_valid_jwt_rs256() {
-        let p1 = json!({
-            "key1" : "val1",
-            "key2" : "val2"
-        });
         let  header = json!({});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg".to_string();
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg";
         let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
         println!("\n{}",h1);
         println!("{}",p1);
@@ -570,13 +615,13 @@ mod tests {
             "key2" : "val2"
         });
         let  header = json!({});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng".to_string();
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng";
         let maybe_valid_sign1 = validate_signature(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
         assert!(maybe_valid_sign1.is_ok());
 
         let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_valid_sign2 = validate_signature(&jwt2, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
- 
+
         assert!(maybe_valid_sign2.unwrap());
     }
 
@@ -587,13 +632,13 @@ mod tests {
             "key2" : "val2"
         });
         let  header = json!({});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng";
         let maybe_valid_sign1 = validate_signature(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
         assert!(maybe_valid_sign1.is_ok());
 
         let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_valid_sign2 = validate_signature(&jwt2, &get_bad_rsa_256_public_key_full_path(), Algorithm::RS256);
- 
+
         assert!(!maybe_valid_sign2.unwrap());
     }
 
@@ -604,7 +649,7 @@ mod tests {
             "key2" : "val2"
         });
         let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::RS256.to_string()});
-        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
+        let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng";
         let (h2, p2) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
         assert_eq!(h1.get("typ").unwrap(), h2.get("typ").unwrap());
         assert_eq!(h1.get("alg").unwrap(), h2.get("alg").unwrap());
@@ -664,7 +709,7 @@ mod tests {
         });
         let h1 = json!({"typ" : "cust", "alg" : Algorithm::ES512.to_string()});
         let header = json!({"typ" : "cust"});
- 
+
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
         let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
         assert_eq!(h1, header);
