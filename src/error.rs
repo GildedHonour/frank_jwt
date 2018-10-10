@@ -60,9 +60,9 @@ impl fmt::Display for Error {
             Error::ExpirationInvalid => write!(f, "Expiration invalid."),
             Error::AudienceInvalid => write!(f, "Audience invalid."),
             Error::FormatInvalid(msg) => write!(f, "Format invalid: {}.", msg),
-            Error::IoError(msg) => write!(f, "Format invalid: {}.", msg),
-            Error::OpenSslError(msg) => write!(f, "Format invalid: {}.", msg),
-            Error::ProtocolError(msg) => write!(f, "Format invalid: {}.", msg),
+            Error::IoError(msg) => write!(f, "IO error: {}.", msg),
+            Error::OpenSslError(msg) => write!(f, "Open SSL error: {}.", msg),
+            Error::ProtocolError(msg) => write!(f, "Protocol error: {}.", msg),
         }
     }
 }
