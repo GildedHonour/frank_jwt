@@ -1,5 +1,5 @@
 /**
- (c) 2015-2018 Alex Maslakov, <gildedhonour.com>, <alexmaslakov.me>
+ (c) 2015-2018 Alex Maslakov, <gildedhonour.com>, <alexmaslakoff.icu>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -311,6 +311,17 @@ fn verify_iss() {
 }
 
 fn verify_iat() {
+
+    //get date-time now
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let start = SystemTime::now();
+    let since_the_epoch = start.duration_since(UNIX_EPOCH).expect("invalid timestamp");
+
+    //get payload[:iat]
+    //ensure it's integer
+    //ensure that date-time now < payload[:iat] 
+
     unimplemented!()
 }
 
@@ -321,10 +332,6 @@ fn verify_expiration() {
 fn verify_aud() {
     unimplemented!()
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -498,6 +505,7 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
+
         let  header = json!({});
         let mut path = env::current_dir().unwrap();
         path.push("test");
@@ -516,6 +524,7 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
+
         let  header = json!({});
         let mut path = env::current_dir().unwrap();
         path.push("test");
@@ -534,6 +543,7 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
+
         let  header = json!({});
         let mut path = env::current_dir().unwrap();
         path.push("test");
@@ -551,6 +561,7 @@ mod tests {
             "key1" : "val1",
             "key2" : "val2"
         });
+
         let  header = json!({});
         let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg".to_string();
         let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
@@ -648,8 +659,8 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
-        let header = json!({});
 
+        let header = json!({});
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
         let maybe_valid_sign = validate_signature(&jwt1, &get_bad_ec_public_key_path(), Algorithm::ES512);
         assert!(!maybe_valid_sign.unwrap());
@@ -662,9 +673,9 @@ mod tests {
             "key2" : "val2",
             "key3" : "val3"
         });
+
         let h1 = json!({"typ" : "cust", "alg" : Algorithm::ES512.to_string()});
         let header = json!({"typ" : "cust"});
- 
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
         let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
         assert_eq!(h1, header);
