@@ -23,6 +23,8 @@ use std::io::Error as IoError;
 use serde_json::Error as SJError;
 use openssl::error::ErrorStack;
 use base64::DecodeError as B64Error;
+use std::error;
+use std::fmt;
 
 macro_rules! impl_error {
     ($from:ty, $to:path) => {
@@ -47,6 +49,25 @@ pub enum Error {
     OpenSslError(String),
     ProtocolError(String),
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::SignatureExpired => write!(f, "Signature expired."),
+            Error::SignatureInvalid => write!(f, "Signature invalid."),
+            Error::JWTInvalid => write!(f, "JWT invalid."),
+            Error::IssuerInvalid => write!(f, "Issuer invalid."),
+            Error::ExpirationInvalid => write!(f, "Expiration invalid."),
+            Error::AudienceInvalid => write!(f, "Audience invalid."),
+            Error::FormatInvalid(msg) => write!(f, "Format invalid: {}.", msg),
+            Error::IoError(msg) => write!(f, "IO error: {}.", msg),
+            Error::OpenSslError(msg) => write!(f, "Open SSL error: {}.", msg),
+            Error::ProtocolError(msg) => write!(f, "Protocol error: {}.", msg),
+        }
+    }
+}
+
+impl error::Error for Error {}
 
 impl_error!{IoError, Error::IoError}
 impl_error!{SJError, Error::FormatInvalid}
