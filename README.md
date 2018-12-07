@@ -46,9 +46,10 @@ use frank_jwt::{Algorithm, encode, decode};
 ```rust
 //HS256
 let mut payload = json!({
-    "key1" : "val1",
-    "key2" : "val2"
+    "key1": "val1",
+    "key2": "val2"
 });
+
 let mut header = json!({});
 let secret = "secret123";
 let jwt = encode(&header, secret.to_string(), &payload, Algorithm::HS256);
@@ -57,9 +58,10 @@ let jwt = encode(&header, secret.to_string(), &payload, Algorithm::HS256);
 use std::env;
 
 let mut payload = json!({
-    "key1" : "val1",
-    "key2" : "val2"
+    "key1": "val1",
+    "key2": "val2"
 });
+
 let mut header = json!({});
 let mut keypath = env::current_dir().unwrap();
 keypath.push("some_folder");
@@ -82,3 +84,7 @@ cargo test
 I'm a freelance developer and looking forward to new challenges.
 
 me@gildedhonour.com | gildedhonour.com
+
+## Contributors
+
+todo
