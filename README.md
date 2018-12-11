@@ -36,7 +36,8 @@ And this in your crate root:
 
 ```rust
 extern crate frank_jwt;
-extern crate  #[macro_use] serde_json;
+#[macro_use] extern crate serde_json;
+
 
 use frank_jwt::{Algorithm, encode, decode};
 ```
