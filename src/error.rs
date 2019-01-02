@@ -1,3 +1,8 @@
+use base64::DecodeError as B64Error;
+use openssl::error::ErrorStack;
+use serde_json::Error as SJError;
+use std::error;
+use std::fmt;
 /**
  * Copyright (c) 2015-2018 Alex Maslakov, <gildedhonour.com>, <alexmaslakoff.icu>
  *
@@ -18,13 +23,7 @@
  * https://github.com/GildedHonour/frank_jwt
  *
  */
-
 use std::io::Error as IoError;
-use serde_json::Error as SJError;
-use openssl::error::ErrorStack;
-use base64::DecodeError as B64Error;
-use std::error;
-use std::fmt;
 
 macro_rules! impl_error {
     ($from:ty, $to:path) => {
@@ -33,7 +32,7 @@ macro_rules! impl_error {
                 $to(format!("{:?}", e))
             }
         }
-    }
+    };
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -69,7 +68,7 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
-impl_error!{IoError, Error::IoError}
-impl_error!{SJError, Error::FormatInvalid}
-impl_error!{ErrorStack, Error::OpenSslError}
-impl_error!{B64Error, Error::ProtocolError}
+impl_error! {IoError, Error::IoError}
+impl_error! {SJError, Error::FormatInvalid}
+impl_error! {ErrorStack, Error::OpenSslError}
+impl_error! {B64Error, Error::ProtocolError}
