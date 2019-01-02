@@ -104,6 +104,25 @@ impl ToKey for Vec<u8> {
     }
 }
 
+/// # Example of payload encoding
+///
+/// #### Using HS256
+/// ```
+/// #[macro_use] extern crate serde_json;
+/// extern crate frank_jwt;
+/// use frank_jwt::encode;
+/// use frank_jwt::Algorithm;
+///
+/// let mut payload = json!({
+///     "key1": "val1",
+///     "key2": "val2"
+/// });
+///
+/// let mut header = json!({});
+/// let secret = "secret123";
+/// let jwt = encode(header, &secret.to_string(), &payload, Algorithm::HS256).unwrap();
+/// ```
+///
 pub fn encode<P: ToKey>(
     mut header: JsonValue,
     signing_key: &P,
@@ -130,6 +149,48 @@ pub fn encode<P: ToKey>(
     Ok(format!("{}.{}", signing_input, signature))
 }
 
+/// # Example of payload encoding and decoding
+///
+/// #### Using HS256
+/// ```
+/// #[macro_use] extern crate serde_json;
+/// extern crate frank_jwt;
+/// use frank_jwt::{encode, decode};
+/// use frank_jwt::Algorithm;
+/// use std::env;
+///
+/// let mut payload = json!({
+///     "key1": "val1",
+///     "key2": "val2"
+/// });
+///
+/// let mut header = json!({});
+/// let secret = "secret123".to_string();
+/// let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
+/// let (header, payload) = decode(&jwt, &secret, Algorithm::HS256).unwrap();
+/// ```
+///
+/// #### Using RS256
+/// ```
+/// #[macro_use] extern crate serde_json;
+/// extern crate frank_jwt;
+/// use frank_jwt::{encode, decode};
+/// use frank_jwt::Algorithm;
+/// use std::env;
+///
+/// let mut payload = json!({
+///     "key1": "val1",
+///     "key2": "val2"
+/// });
+///
+/// let mut header = json!({});
+/// let mut keypath = env::current_dir().unwrap();
+/// keypath.push("test/my_rsa_2048_key.pem");
+/// let jwt = encode(header, &keypath.to_path_buf(), &payload, Algorithm::RS256).unwrap();
+/// let mut keypath = env::current_dir().unwrap();
+/// keypath.push("test/my_rsa_public_2048_key.pem");
+/// let (header, payload) = decode(&jwt, &keypath.to_path_buf(), Algorithm::RS256).unwrap();
+/// ```
 pub fn decode<P: ToKey>(
     encoded_token: &String,
     signing_key: &P,
@@ -143,6 +204,18 @@ pub fn decode<P: ToKey>(
     }
 }
 
+/// # Example of signature validation
+///
+/// ```
+/// extern crate frank_jwt;
+/// use frank_jwt::validate_signature;
+/// use frank_jwt::Algorithm;
+///
+/// let secret = "secret123".to_string();
+/// let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
+/// validate_signature(&jwt, &secret, Algorithm::HS256).unwrap();
+/// ```
+///
 pub fn validate_signature<P: ToKey>(
     encoded_token: &String,
     signing_key: &P,

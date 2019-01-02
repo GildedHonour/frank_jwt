@@ -53,7 +53,7 @@ let mut payload = json!({
 
 let mut header = json!({});
 let secret = "secret123";
-let jwt = encode(&header, secret.to_string(), &payload, Algorithm::HS256);
+let jwt = encode(header, &secret.to_string(), &payload, Algorithm::HS256).unwrap();
 
 //RS256
 use std::env;
@@ -65,10 +65,10 @@ let mut payload = json!({
 
 let mut header = json!({});
 let mut keypath = env::current_dir().unwrap();
-keypath.push("some_folder");
-keypath.push("my_rsa_2048_key.pem");
-let jwt = encode(&header, &keypath.to_path_buf(), &payload, Algorithm::RS256);
-let (header, payload) = decode(&jwt, &keypath.to_path_buf(), Algorithm::RS256);
+keypath.push("some_folder/my_rsa_2048_key.pem");
+let jwt = encode(header, &keypath.to_path_buf(), &payload, Algorithm::RS256).unwrap();
+keypath.push("some_folder/my_rsa_public_2048_key.pem");
+let (header, payload) = decode(&jwt, &keypath.to_path_buf(), Algorithm::RS256).unwrap();
 ```
 
 ## License
