@@ -98,6 +98,12 @@ impl ToKey for String {
     }
 }
 
+impl ToKey for &str {
+    fn to_key(&self) -> Result<Vec<u8>, Error> {
+        Ok(self.as_bytes().to_vec())
+    }
+}
+
 impl ToKey for Vec<u8> {
     fn to_key(&self) -> Result<Vec<u8>, Error> {
         Ok(self.clone())
@@ -347,7 +353,7 @@ mod tests {
             "key3" : "val3"
         });
 
-        let secret = "secret123".to_string();
+        let secret = "secret123";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS256).unwrap();
         let maybe_res = decode(&jwt1, &secret, Algorithm::HS256);
