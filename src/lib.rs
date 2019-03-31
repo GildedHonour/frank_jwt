@@ -36,11 +36,13 @@ use std::fs::File;
 use std::path::{PathBuf};
 use std::io::Read;
 use std::str;
-use openssl::hash::MessageDigest;
+use openssl::bn::BigNum;
+use openssl::hash::{hash, MessageDigest};
 use openssl::pkey::{PKey, Private};
 use openssl::rsa::Rsa;
 use openssl::sign::{Signer, Verifier};
 use openssl::ec::EcKey;
+use openssl::ecdsa::EcdsaSig;
 use serde_json::Value as JsonValue;
 use base64::{encode_config as b64_enc, decode_config as b64_dec};
 
@@ -177,7 +179,6 @@ fn sign_rsa<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) ->
 
 fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> Result<String, Error> {
     let ec_key = EcKey::private_key_from_pem(&private_key_path.to_key()?)?;
-    let key = PKey::from_ec_key(ec_key)?;
     let stp = match algorithm {
         Algorithm::ES256 => MessageDigest::sha256(),
         Algorithm::ES384 => MessageDigest::sha384(),
@@ -185,7 +186,16 @@ fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> 
         _  => panic!("Invalid hmac algorithm")
     };
 
-    sign(data, key, stp)
+    let hash = hash(stp, data.as_bytes())?;
+    let sig = EcdsaSig::sign(&hash, &ec_key)?;
+
+    let r = sig.r().to_vec();
+    let s = sig.s().to_vec();
+    let mut signature: Vec<u8> = Vec::with_capacity(64);
+    signature.splice(32 - r.len().., r);
+    signature.splice(64 - s.len().., s);
+
+    Ok(b64_enc(signature.as_slice(), base64::URL_SAFE_NO_PAD))
 }
 
 fn sign(data: &str, private_key: PKey<Private>, digest: MessageDigest) -> Result<String, Error> {
@@ -266,11 +276,20 @@ fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signa
         },
         Algorithm::ES256 | Algorithm::ES384 | Algorithm::ES512 => {
             let key = PKey::public_key_from_pem(&public_key.to_key()?).map_err(Error::from)?;
+            let ec_key = key.ec_key()?;
+
+            // EC signatures must be a 64-octet sequence
+            if signature.len() != 64 {
+                return Err(Error::SignatureInvalid);
+            }
+
+            let r = BigNum::from_slice(&signature[..32])?;
+            let s = BigNum::from_slice(&signature[32..64])?;
+            let sig = EcdsaSig::from_private_components(r, s)?;
 
             let digest = get_sha_algorithm(algorithm);
-            let mut verifier = Verifier::new(digest, &key)?;
-            verifier.update(signing_input.as_bytes())?;
-            verifier.verify(&signature).map_err(Error::from)
+            let hash = hash(digest, signing_input.as_bytes())?;
+            sig.verify(&hash, &ec_key).map_err(Error::from)
         },
     }
 }
@@ -344,6 +363,7 @@ mod tests {
     use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE};
     use std::env;
     use std::path::PathBuf;
+    use error::Error;
 
     #[test]
     fn test_encode_and_decode_jwt_hs256() {
@@ -660,6 +680,20 @@ mod tests {
         let jwt2 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
         let maybe_valid_sign2 = validate_signature(&jwt2, &get_ec_public_key_path(), Algorithm::ES512);
         assert!(maybe_valid_sign2.unwrap());
+    }
+
+    #[test]
+    fn test_validate_signature_jwt_ec_invalid_length() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+        let header = json!({});
+
+        let jwt1 = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.ClXK6cQOk3RgRRNZH53OFvamD9LT2mXo-YEZDlwx1tWu2xkZ9g";
+        let maybe_valid_sign1 = validate_signature(jwt1, &get_ec_public_key_path(), Algorithm::ES256);
+        assert_eq!(maybe_valid_sign1, Err(Error::SignatureInvalid));
     }
 
     #[test]
