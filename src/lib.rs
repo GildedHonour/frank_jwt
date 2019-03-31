@@ -653,9 +653,13 @@ mod tests {
         });
         let header = json!({});
 
-        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let maybe_valid_sign = validate_signature(&jwt1, &get_ec_public_key_path(), Algorithm::ES512);
-        assert!(maybe_valid_sign.unwrap());
+        let jwt1 = "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.ClXK6cQOk3RgRRNZH53OFvamD9LT2mXo-YEZDlwx1tWu2xkZ9gfBEf2s6xQ9kwDAEna38upYNOrz47KkDkppZA";
+        let maybe_valid_sign1 = validate_signature(jwt1, &get_ec_public_key_path(), Algorithm::ES256);
+        assert!(maybe_valid_sign1.unwrap());
+
+        let jwt2 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
+        let maybe_valid_sign2 = validate_signature(&jwt2, &get_ec_public_key_path(), Algorithm::ES512);
+        assert!(maybe_valid_sign2.unwrap());
     }
 
     #[test]
