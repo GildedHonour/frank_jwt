@@ -1,5 +1,5 @@
 [package]
-authors = ["Alex Maslakov <me@gildedhonour.com>, <abc@nothingness.xyz>"]
+authors = ["Alex Maslakov <me@gildedhonour.me>"]
 description = "Implementation of JSON JWT"
 documentation = "https://github.com/GildedHonour/frank_jwt"
 homepage = "https://github.com/GildedHonour/frank_jwt"
@@ -8,7 +8,7 @@ license = "Apache-2.0"
 name = "frank_jwt"
 readme = "README.md"
 repository = "https://github.com/GildedHonour/frank_jwt"
-version = "3.1.0"
+version = "3.1.1"
 
 [dependencies]
 base64 = "0.10.0"
