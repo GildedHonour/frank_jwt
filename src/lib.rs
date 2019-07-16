@@ -65,6 +65,33 @@ pub enum Algorithm {
     ES512
 }
 
+pub struct ValidationOptions {
+    verify_exp: bool,
+    exp_leeway: u64
+}
+
+impl ValidationOptions {
+    pub fn new() -> ValidationOptions {
+        ValidationOptions::default()
+    }
+
+    pub fn dangerous() -> ValidationOptions {
+        ValidationOptions {
+            verify_exp: false,
+            exp_leeway: 0
+        }
+    }
+}
+
+impl Default for ValidationOptions {
+    fn default() -> ValidationOptions {
+        ValidationOptions {
+            verify_exp: true,
+            exp_leeway: 0
+        }
+    }
+}
+
 impl ToString for Algorithm {
     fn to_string(&self) -> String {
         match *self {
@@ -127,10 +154,12 @@ pub fn encode<P: ToKey>(mut header: JsonValue, signing_key: &P, payload: &JsonVa
     Ok(format!("{}.{}", signing_input, signature))
 }
 
-pub fn decode<P: ToKey>(encoded_token: &str, signing_key: &P, algorithm: Algorithm) -> Result<(JsonValue, JsonValue), Error> {
+pub fn decode<P: ToKey>(encoded_token: &str, signing_key: &P, algorithm: Algorithm, validation: &ValidationOptions) -> Result<(JsonValue, JsonValue), Error> {
     let (header, payload, signature, signing_input) = decode_segments(encoded_token)?;
     if !verify_signature(algorithm, signing_input, &signature, signing_key)? {
         Err(Error::SignatureInvalid)
+    } else if validation.verify_exp && !verify_expiration(&payload, validation.exp_leeway) {
+        Err(Error::ExpirationInvalid)
     } else {
         Ok((header, payload))
     }
@@ -345,13 +374,24 @@ fn verify_iat() {
 
     //get payload[:iat]
     //ensure it's integer
-    //ensure that date-time now < payload[:iat] 
+    //ensure that date-time now < payload[:iat]
 
     unimplemented!()
 }
 
-fn verify_expiration() {
-    unimplemented!()
+fn verify_expiration(payload: &serde_json::Value, leeway: u64) -> bool {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let exp = match payload.get("exp") {
+        Some(v) => v,
+        None => return false
+    }.as_u64().unwrap_or(0);
+
+    let utc = match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(v) => v,
+        Err(_) => return false
+    }.as_secs();
+
+    (exp + leeway) > utc
 }
 
 fn verify_aud() {
@@ -360,7 +400,7 @@ fn verify_aud() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE};
+    use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE, ValidationOptions};
     use std::env;
     use std::path::PathBuf;
     use error::Error;
@@ -376,7 +416,7 @@ mod tests {
         let secret = "secret123";
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS256).unwrap();
-        let maybe_res = decode(&jwt1, &secret, Algorithm::HS256);
+        let maybe_res = decode(&jwt1, &secret, Algorithm::HS256, &ValidationOptions::dangerous());
         assert!(maybe_res.is_ok());
     }
 
@@ -388,7 +428,7 @@ mod tests {
         });
         let secret = "secret123".to_string();
         let jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxMSI6InZhbDEiLCJrZXkyMiI6InZhbDIifQ.jrcoVcRsmQqDEzSW9qOhG1HIrzV_n3nMhykNPnGvp9c".to_string();
-        let maybe_res = decode(&jwt, &secret, Algorithm::HS256);
+        let maybe_res = decode(&jwt, &secret, Algorithm::HS256, &ValidationOptions::dangerous());
         assert!(maybe_res.is_ok());
     }
 
@@ -443,7 +483,7 @@ mod tests {
         let secret = "secret123".to_string();
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS384).unwrap();
-        let maybe_res = decode(&jwt1, &secret, Algorithm::HS384);
+        let maybe_res = decode(&jwt1, &secret, Algorithm::HS384, &ValidationOptions::dangerous());
         assert!(maybe_res.is_ok());
     }
 
@@ -489,7 +529,7 @@ mod tests {
         let secret = "secret123456".to_string();
         let  header = json!({});
         let jwt1 = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
-        let maybe_res = decode(&jwt1, &secret, Algorithm::HS512);
+        let maybe_res = decode(&jwt1, &secret, Algorithm::HS512, &ValidationOptions::dangerous());
         assert!(maybe_res.is_ok());
     }
 
@@ -539,7 +579,7 @@ mod tests {
         path.to_str().unwrap().to_string();
 
         let jwt1 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
-        let maybe_res = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
+        let maybe_res = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256, &ValidationOptions::dangerous());
         assert!(maybe_res.is_ok());
     }
 
@@ -590,11 +630,11 @@ mod tests {
 
         let  header = json!({});
         let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0.DFusERCFWCL3CkKBaoVKsi1Z3QO2NTTRDTGHPqm7ctzypKHxLslJXfS1p_8_aRX30V2osMAEfGzXO9U0S9J1Z7looIFNf5rWSEcqA3ah7b7YQ2iTn9LOiDWwzVG8rm_HQXkWq-TXqayA-IXeiX9pVPB9bnguKXy3YrLWhP9pxnhl2WmaE9ryn8WTleMiElwDq4xw5JDeopA-qFS-AyEwlc-CE7S_afBd5OQBRbvgtfv1a9soNW3KP_mBg0ucz5eUYg_ON17BG6bwpAwyFuPdDAXphG4hCsa7GlXea0f7DnYD5e5-CA6O7BPW_EvjaGhL_D9LNWHJuDiSDBwZ4-IEIg".to_string();
-        let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
+        let (h1, p1) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256, &ValidationOptions::dangerous()).unwrap();
         println!("\n{}",h1);
         println!("{}",p1);
         let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
-        let (h2, p2) = decode(&jwt2, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
+        let (h2, p2) = decode(&jwt2, &get_rsa_256_public_key_full_path(), Algorithm::RS256, &ValidationOptions::dangerous()).unwrap();
         println!("{}",h2);
         println!("{}",p2);
         assert_eq!(jwt1, jwt2);
@@ -613,7 +653,7 @@ mod tests {
 
         let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_valid_sign2 = validate_signature(&jwt2, &get_rsa_256_public_key_full_path(), Algorithm::RS256);
- 
+
         assert!(maybe_valid_sign2.unwrap());
     }
 
@@ -630,7 +670,7 @@ mod tests {
 
         let jwt2 = encode(header, &get_rsa_256_private_key_full_path(), &p1, Algorithm::RS256).unwrap();
         let maybe_valid_sign2 = validate_signature(&jwt2, &get_bad_rsa_256_public_key_full_path(), Algorithm::RS256);
- 
+
         assert!(!maybe_valid_sign2.unwrap());
     }
 
@@ -642,7 +682,7 @@ mod tests {
         });
         let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::RS256.to_string()});
         let jwt1 = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkxIjoidmFsMSIsImtleTIiOiJ2YWwyIn0=.RQdLX70LEWL3PFePR2ec7fsBLwi29qK9GL_YfiBKcOWnWsgWMrw0PeJw8h21FloKAYYRq73GmSlF39B5TWbquscf3obfD_y3TYmSjY_STlQ1UTMBnCmwZeMgxuIlq4l7RNpGh_j-42u6YJ3b4zwFiiIGWANYTL0pzXjdIFcUhuY7yeYlFHmWgUOOfv_E_MaP0CgCK6rgeorPtFZ80Z-zYc2R7oXLylgiwJQmwLGzxAcOOcNaZurhQxUQ7GrErY9fOLxfw0vmF4FMSIhQvWIiUV9Meh3MoIwybDhuy5-Y85WZwtXYC7blAZhU0h6tFqwBozt7PS34htj8rkCIqqi0Ng==".to_string();
-        let (h2, p2) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256).unwrap();
+        let (h2, p2) = decode(&jwt1, &get_rsa_256_public_key_full_path(), Algorithm::RS256, &ValidationOptions::dangerous()).unwrap();
         assert_eq!(h1.get("typ").unwrap(), h2.get("typ").unwrap());
         assert_eq!(h1.get("alg").unwrap(), h2.get("alg").unwrap());
         assert_eq!(p1, p2);
@@ -659,7 +699,7 @@ mod tests {
         let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::ES512.to_string()});
 
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
+        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512, &ValidationOptions::dangerous()).unwrap();
         assert_eq!(p1, payload);
         assert_eq!(h1, header);
     }
@@ -721,9 +761,43 @@ mod tests {
         let h1 = json!({"typ" : "cust", "alg" : Algorithm::ES512.to_string()});
         let header = json!({"typ" : "cust"});
         let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512).unwrap();
+        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512, &ValidationOptions::dangerous()).unwrap();
         assert_eq!(h1, header);
         assert_eq!(p1, payload);
+    }
+
+    #[test]
+    fn test_invalidate_exp() {
+        let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJmcmFua19qd3QgdGVzdCIsImlhdCI6MTU2MzI5OTg0MCwiZXhwIjoxNTYzMjk5ODQ4LCJhdWQiOiIiLCJzdWIiOiIifQ.PgwVxIO_2I4pWiY5bLTD5EzBgcYYabxvFk7vuPO2ZPE";
+        let result = decode(&jwt, &String::from("secret123"), Algorithm::HS256, &ValidationOptions::default());
+        assert_eq!(result.is_err(), true);
+        assert_eq!(result.err().unwrap(), Error::ExpirationInvalid);
+
+    }
+
+    #[test]
+    fn test_valid_exp() {
+        // This JWT will expire in 2080...
+        let jwt = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJmcmFua19qd3QgdGVzdCIsImlhdCI6MTU2MzI5OTg0MCwiZXhwIjozNDg4MjkyMTgzLCJhdWQiOiIiLCJzdWIiOiIifQ.jYOfBQd7QbrlSuCjXrfw4rxc2IVo3igAxZyNz49Voek";
+        let result = decode(&jwt, &String::from("secret123"), Algorithm::HS256, &ValidationOptions::default());
+        assert_eq!(result.is_ok(), true);
+    }
+
+    #[test]
+    fn test_leeway_exp() {
+        let utc = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+        let p1 = json!({
+            "exp" : utc - 2,
+        });
+
+        let secret = "secret123".to_string();
+        let header = json!({});
+        let jwt = encode(header, &secret, &p1, Algorithm::HS512).unwrap();
+
+        let mut validation = ValidationOptions::default();
+        validation.exp_leeway = 5;
+        let result = decode(&jwt, &String::from("secret123"), Algorithm::HS512, &validation);
+        assert_eq!(result.is_ok(), true);
     }
 
     fn get_ec_private_key_path() -> PathBuf {
