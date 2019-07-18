@@ -1,7 +1,7 @@
 Frank JWT [![Build Status](https://travis-ci.org/GildedHonour/frank_jwt.svg)](https://travis-ci.org/GildedHonour/frank_jwt) [![crates.io](https://img.shields.io/crates/v/frank_jwt.svg)](https://crates.io/crates/frank_jwt)
 ================================================
 
-Implementation of [JSON Web Tokens](http://jwt.io) in Rust.
+Implementation of [JSON Web Tokens](https://jwt.io) in Rust.
 
 ## Algorithms and features supported
 - [x] HS256
@@ -91,11 +91,7 @@ Apache 2.0
 cargo test
 ```
 
-## I'm available for hire
-I'm a freelance developer and looking forward to new challenges.
-
-me@gildedhonour.com | gildedhonour.com
 
 ## Contributors
 
-todo
+TODO
