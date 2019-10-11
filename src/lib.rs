@@ -220,9 +220,9 @@ fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> 
 
     let r = sig.r().to_vec();
     let s = sig.s().to_vec();
-    let mut signature: Vec<u8> = Vec::with_capacity(64);
-    signature.splice(32 - r.len().., r);
-    signature.splice(64 - s.len().., s);
+    let mut signature: Vec<u8> = [0; 64].to_vec();
+    signature.splice(32 - r.len()..32, r);
+    signature.splice(64 - s.len()..64, s);
 
     Ok(b64_enc(signature.as_slice(), base64::URL_SAFE_NO_PAD))
 }
