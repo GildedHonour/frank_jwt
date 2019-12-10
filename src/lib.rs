@@ -36,7 +36,8 @@ use std::fs::File;
 use std::path::{PathBuf};
 use std::io::Read;
 use std::str;
-use openssl::bn::BigNum;
+use std::convert::TryInto;
+use openssl::bn::{BigNum, BigNumContext};
 use openssl::hash::{hash, MessageDigest};
 use openssl::pkey::{PKey, Private};
 use openssl::rsa::Rsa;
@@ -206,6 +207,19 @@ fn sign_rsa<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) ->
     sign(data, key, stp)
 }
 
+#[cfg(ossl110)]
+fn order_bytes(g: &openssl::ec::EcGroupRef) -> i32 {
+    ((g.order_bits() + 7) / 8).try_into().unwrap()
+}
+
+#[cfg(not(ossl110))]
+fn order_bytes(g: &openssl::ec::EcGroupRef) -> i32 {
+    let mut bnc = BigNumContext::new().unwrap();
+    let mut bn = BigNum::new().unwrap();
+    g.order(&mut bn, &mut bnc).unwrap();
+    bn.num_bytes()
+}
+
 fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> Result<String, Error> {
     let ec_key = EcKey::private_key_from_pem(&private_key_path.to_key()?)?;
     let stp = match algorithm {
@@ -218,11 +232,16 @@ fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> 
     let hash = hash(stp, data.as_bytes())?;
     let sig = EcdsaSig::sign(&hash, &ec_key)?;
 
-    let r = sig.r().to_vec();
-    let s = sig.s().to_vec();
-    let mut signature: Vec<u8> = [0; 64].to_vec();
-    signature.splice(32 - r.len()..32, r);
-    signature.splice(64 - s.len()..64, s);
+    let o_bytes = order_bytes(ec_key.group());
+
+    let signature: Vec<u8> = [sig.r(), sig.s()]
+        .iter()
+        .flat_map(|x| {
+            std::iter::repeat(0)
+                .take((o_bytes - x.num_bytes()).try_into().unwrap())
+                .chain(x.to_vec().into_iter())
+        })
+        .collect();
 
     Ok(b64_enc(signature.as_slice(), base64::URL_SAFE_NO_PAD))
 }
