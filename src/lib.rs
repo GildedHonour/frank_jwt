@@ -52,6 +52,8 @@ const SEGMENTS_COUNT: usize = 3;
 
 const STANDARD_HEADER_TYPE: &str = "JWT";
 
+const MAXIMUM_EC_SIGNATURE_LENGTH: usize = 132;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Algorithm {
     HS256,
@@ -218,13 +220,16 @@ fn sign_es<P: ToKey>(data: &str, private_key_path: &P, algorithm: Algorithm) -> 
     let hash = hash(stp, data.as_bytes())?;
     let sig = EcdsaSig::sign(&hash, &ec_key)?;
 
+    let length = es_signature_length(algorithm);
+    let middle = length / 2;
+
     let r = sig.r().to_vec();
     let s = sig.s().to_vec();
-    let mut signature: Vec<u8> = [0; 64].to_vec();
-    signature.splice(32 - r.len()..32, r);
-    signature.splice(64 - s.len()..64, s);
+    let mut signature: Vec<u8> = [0; MAXIMUM_EC_SIGNATURE_LENGTH].to_vec();
+    signature.splice(middle - r.len()..middle, r);
+    signature.splice(length - s.len()..length, s);
 
-    Ok(b64_enc(signature.as_slice(), base64::URL_SAFE_NO_PAD))
+    Ok(b64_enc(&signature[0..length], base64::URL_SAFE_NO_PAD))
 }
 
 fn sign(data: &str, private_key: PKey<Private>, digest: MessageDigest) -> Result<String, Error> {
@@ -287,6 +292,15 @@ fn sign_hmac2(data: &str, key: &Vec<u8>, algorithm: Algorithm) -> Result<Vec<u8>
     signer.sign_to_vec().map_err(Error::from)
 }
 
+fn es_signature_length(algorithm: Algorithm) -> usize {
+    return match algorithm {
+        Algorithm::ES256 => 64,
+        Algorithm::ES384 => 96,
+        Algorithm::ES512 => 132,
+        _ => unreachable!()
+    };
+}
+
 fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signature: &[u8], public_key: &P) -> Result<bool, Error> {
     match algorithm {
         Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
@@ -307,13 +321,16 @@ fn verify_signature<P: ToKey>(algorithm: Algorithm, signing_input: String, signa
             let key = PKey::public_key_from_pem(&public_key.to_key()?).map_err(Error::from)?;
             let ec_key = key.ec_key()?;
 
-            // EC signatures must be a 64-octet sequence
-            if signature.len() != 64 {
+            let length = es_signature_length(algorithm);
+
+            if signature.len() != length {
                 return Err(Error::SignatureInvalid);
             }
 
-            let r = BigNum::from_slice(&signature[..32])?;
-            let s = BigNum::from_slice(&signature[32..64])?;
+            let middle = length / 2;
+
+            let r = BigNum::from_slice(&signature[..middle])?;
+            let s = BigNum::from_slice(&signature[middle..length])?;
             let sig = EcdsaSig::from_private_components(r, s)?;
 
             let digest = get_sha_algorithm(algorithm);
@@ -689,23 +706,23 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_and_decode_jwt_ec() {
+    fn test_encode_and_decode_jwt_ec256() {
         let p1 = json!({
             "key1" : "val1",
             "key2" : "val2",
             "key3" : "val3"
         });
         let header = json!({});
-        let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::ES512.to_string()});
+        let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::ES256.to_string()});
 
-        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512, &ValidationOptions::dangerous()).unwrap();
+        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES256).unwrap();
+        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES256, &ValidationOptions::dangerous()).unwrap();
         assert_eq!(p1, payload);
         assert_eq!(h1, header);
     }
 
     #[test]
-    fn test_validate_signature_jwt_ec() {
+    fn test_validate_signature_jwt_ec256() {
         let p1 = json!({
             "key1" : "val1",
             "key2" : "val2",
@@ -717,13 +734,13 @@ mod tests {
         let maybe_valid_sign1 = validate_signature(jwt1, &get_ec_public_key_path(), Algorithm::ES256);
         assert!(maybe_valid_sign1.unwrap());
 
-        let jwt2 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let maybe_valid_sign2 = validate_signature(&jwt2, &get_ec_public_key_path(), Algorithm::ES512);
+        let jwt2 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES256).unwrap();
+        let maybe_valid_sign2 = validate_signature(&jwt2, &get_ec_public_key_path(), Algorithm::ES256);
         assert!(maybe_valid_sign2.unwrap());
     }
 
     #[test]
-    fn test_validate_signature_jwt_ec_invalid_length() {
+    fn test_validate_signature_jwt_ec256_invalid_length() {
         let p1 = json!({
             "key1" : "val1",
             "key2" : "val2",
@@ -737,7 +754,7 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_signature_jwt_ec_invalid() {
+    fn test_validate_signature_jwt_ec256_invalid() {
         let p1 = json!({
             "key1" : "val1",
             "key2" : "val2",
@@ -745,9 +762,25 @@ mod tests {
         });
 
         let header = json!({});
-        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let maybe_valid_sign = validate_signature(&jwt1, &get_bad_ec_public_key_path(), Algorithm::ES512);
+        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES256).unwrap();
+        let maybe_valid_sign = validate_signature(&jwt1, &get_bad_ec_public_key_path(), Algorithm::ES256);
         assert!(!maybe_valid_sign.unwrap());
+    }
+
+    #[test]
+    fn test_encode_and_decode_jwt_ec521() {
+        let p1 = json!({
+            "key1" : "val1",
+            "key2" : "val2",
+            "key3" : "val3"
+        });
+        let header = json!({});
+        let h1 = json!({"typ" : STANDARD_HEADER_TYPE, "alg" : Algorithm::ES512.to_string()});
+
+        let jwt1 = encode(header, &get_ec521_private_key_path(), &p1, Algorithm::ES512).unwrap();
+        let (header, payload) = decode(&jwt1, &get_ec521_public_key_path(), Algorithm::ES512, &ValidationOptions::dangerous()).unwrap();
+        assert_eq!(p1, payload);
+        assert_eq!(h1, header);
     }
 
     #[test]
@@ -758,10 +791,10 @@ mod tests {
             "key3" : "val3"
         });
 
-        let h1 = json!({"typ" : "cust", "alg" : Algorithm::ES512.to_string()});
+        let h1 = json!({"typ" : "cust", "alg" : Algorithm::ES256.to_string()});
         let header = json!({"typ" : "cust"});
-        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES512).unwrap();
-        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES512, &ValidationOptions::dangerous()).unwrap();
+        let jwt1 = encode(header, &get_ec_private_key_path(), &p1, Algorithm::ES256).unwrap();
+        let (header, payload) = decode(&jwt1, &get_ec_public_key_path(), Algorithm::ES256, &ValidationOptions::dangerous()).unwrap();
         assert_eq!(h1, header);
         assert_eq!(p1, payload);
     }
@@ -811,6 +844,20 @@ mod tests {
         let mut path = env::current_dir().unwrap();
         path.push("test");
         path.push("ec_x9_62_prime256v1.public.key.pem");
+        path.to_path_buf()
+    }
+
+    fn get_ec521_private_key_path() -> PathBuf {
+        let mut path = env::current_dir().unwrap();
+        path.push("test");
+        path.push("es512_private_key.pem");
+        path.to_path_buf()
+    }
+
+    fn get_ec521_public_key_path() -> PathBuf {
+        let mut path = env::current_dir().unwrap();
+        path.push("test");
+        path.push("es512_public_key.pem");
         path.to_path_buf()
     }
 
