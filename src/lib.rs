@@ -401,7 +401,7 @@ fn verify_expiration(payload: &serde_json::Value, leeway: u64) -> bool {
     let exp = match payload.get("exp") {
         Some(v) => v,
         None => return false
-    }.as_u64().unwrap_or(0);
+    }.as_f64().unwrap_or(0.0) as u64;
 
     let utc = match SystemTime::now().duration_since(UNIX_EPOCH) {
         Ok(v) => v,
@@ -417,9 +417,11 @@ fn verify_aud() {
 
 #[cfg(test)]
 mod tests {
-    use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE, ValidationOptions};
+    use super::{Algorithm, encode, decode, validate_signature, secure_compare, STANDARD_HEADER_TYPE, ValidationOptions, verify_expiration};
     use std::env;
+    use std::ops::{Add, Sub};
     use std::path::PathBuf;
+    use std::time::Duration;
     use error::Error;
 
     #[test]
@@ -831,6 +833,42 @@ mod tests {
         validation.exp_leeway = 5;
         let result = decode(&jwt, &String::from("secret123"), Algorithm::HS512, &validation);
         assert_eq!(result.is_ok(), true);
+    }
+
+    #[test]
+    fn test_verify_integer_unix_timestamp_in_future() {
+        let utc = std::time::SystemTime::now().add(Duration::from_secs(60)).duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+
+        let result = verify_expiration(&json!({"exp" : utc}), 0);
+
+        assert!(result);
+    }
+
+    #[test]
+    fn test_do_not_verify_integer_unix_timestamp_in_past() {
+        let utc = std::time::SystemTime::now().sub(Duration::from_secs(60)).duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+
+        let result = verify_expiration(&json!({"exp" : utc}), 0);
+
+        assert!(!result);
+    }
+
+    #[test]
+    fn test_verify_float_unix_timestamp_in_future() {
+        let utc = std::time::SystemTime::now().add(Duration::from_secs(60)).duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64();
+
+        let result = verify_expiration(&json!({"exp" : utc}), 0);
+
+        assert!(result);
+    }
+
+    #[test]
+    fn test_do_not_float_integer_unix_timestamp_in_past() {
+        let utc = std::time::SystemTime::now().sub(Duration::from_secs(60)).duration_since(std::time::UNIX_EPOCH).unwrap().as_secs_f64();
+
+        let result = verify_expiration(&json!({"exp" : utc}), 0);
+
+        assert!(!result);
     }
 
     fn get_ec_private_key_path() -> PathBuf {
